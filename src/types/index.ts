@@ -1,19 +1,19 @@
-// API Types
+// src/types/index.ts
+// User related interfaces
 export interface User {
-  id: string;
+  id: string | number;
   firstName: string;
   lastName: string;
   email: string;
-  createdAt: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user: User;
+  phoneNumber?: string | null;
+  address?: string | null;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LoginRequest {
-  email: string;
+  username: string; // Will be mapped to email in the auth service
   password: string;
 }
 
@@ -22,48 +22,46 @@ export interface RegisterRequest {
   lastName: string;
   email: string;
   password: string;
+  phoneNumber?: string;
+  address?: string;
 }
 
+// Response from backend when registering
+export interface RegisterResponse {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string | null;
+  address: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Auth response for login/refresh
+export interface AuthResponse {
+  token: string;
+  refreshToken?: string;
+  user: User;
+  expiresIn?: number;
+}
+
+// Category interface
+export interface Category {
+  id: number | string;
+  name: string;
+  description?: string;
+}
+
+// Product related interfaces
 export interface Product {
-  id: string;
+  id: number | string;
   name: string;
   description: string;
   price: number;
-  imageUrl: string;
-  category: string;
-  inStock: boolean;
-}
-
-export interface CartItem {
-  id: string;
-  productId: string;
-  name: string;
-  price: number;
   quantity: number;
-  imageUrl: string;
-}
-
-export interface Order {
-  id: string;
-  userId: string;
-  items: CartItem[];
-  totalAmount: number;
-  status: string;
-  shippingAddress: Address;
-  paymentMethod: PaymentMethod;
-  createdAt: string;
-}
-
-export interface Address {
-  streetAddress: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-}
-
-export interface PaymentMethod {
-  type: string;
-  cardLast4?: string;
-  expiryDate?: string;
+  inStock?: boolean;
+  imageUrl?: string;
+  category?: Category;
 }

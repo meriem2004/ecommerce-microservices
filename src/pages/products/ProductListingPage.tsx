@@ -27,13 +27,19 @@ const ProductListingPage: React.FC = () => {
     }
   }, [dispatch, searchTerm]);
   
-  // Filter products by category
-  const filteredProducts = selectedCategory
-    ? products.filter((product) => product.category === selectedCategory)
-    : products;
-  
   // Get unique categories for filter
-  const categories = [...new Set(products.map((product) => product.category))];
+  const categories = Array.from(
+    new Set(
+      products
+        .filter(product => product.category)
+        .map(product => product.category?.name)
+    )
+  );
+  
+  // Filter products by selected category name
+  const filteredProducts = selectedCategory
+    ? products.filter(product => product.category && product.category.name === selectedCategory)
+    : products;
   
   return (
     <div className="pb-16">
@@ -94,7 +100,7 @@ const ProductListingPage: React.FC = () => {
                       name="category"
                       type="radio"
                       checked={selectedCategory === category}
-                      onChange={() => setSelectedCategory(category)}
+                      onChange={() => setSelectedCategory(category || '')}
                       className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <label

@@ -5,6 +5,7 @@ import * as authService from '../services/auth';
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -13,6 +14,7 @@ interface AuthState {
 const initialState: AuthState = {
   user: authService.getCurrentUser(),
   token: localStorage.getItem('auth_token'),
+  refreshToken: localStorage.getItem('refresh_token'),
   isAuthenticated: authService.isAuthenticated(),
   loading: false,
   error: null,
@@ -41,6 +43,21 @@ export const registerUser = createAsyncThunk(
   }
 );
 
+export const refreshAuthToken = createAsyncThunk(
+  'auth/refreshToken',
+  async (_, { rejectWithValue }) => {
+    try {
+      const newToken = await authService.refreshToken();
+      if (!newToken) {
+        throw new Error('Token refresh failed');
+      }
+      return newToken;
+    } catch (error: any) {
+      return rejectWithValue('Token refresh failed');
+    }
+  }
+);
+
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
   authService.logout();
 });
@@ -65,6 +82,7 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken || null;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -81,16 +99,30 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken || null;
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
       
+      // Refresh token cases
+      .addCase(refreshAuthToken.fulfilled, (state, action) => {
+        state.token = action.payload;
+      })
+      .addCase(refreshAuthToken.rejected, (state) => {
+        // If token refresh fails, logout
+        state.user = null;
+        state.token = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+      })
+      
       // Logout case
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
         state.token = null;
+        state.refreshToken = null;
         state.isAuthenticated = false;
       });
   },

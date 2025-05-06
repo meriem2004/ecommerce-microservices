@@ -1,23 +1,85 @@
-import React, { useEffect } from 'react';
+// src/pages/HomePage.tsx
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Truck, CreditCard, ShieldCheck } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../store';
-import { fetchProducts } from '../store/productSlice';
+import { RootState, AppDispatch } from '../store';
+import { fetchProducts, clearProductError } from '../store/productSlice';
 import ProductCard from '../components/products/ProductCard';
 import Button from '../components/common/Button';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 
-const HomePage: React.FC = () => {
-  const dispatch = useDispatch();
-  const { products, loading } = useSelector((state: RootState) => state.products);
-  
+const FeaturedProducts: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { products, loading, error } = useSelector((state: RootState) => state.products);
+  const [retryCount, setRetryCount] = useState(0);
+
   useEffect(() => {
-    dispatch(fetchProducts());
-  }, [dispatch]);
-  
+    const loadProducts = async () => {
+      try {
+        await dispatch(fetchProducts()).unwrap();
+      } catch (err) {
+        console.error('Error loading featured products:', err);
+      }
+    };
+
+    loadProducts();
+  }, [dispatch, retryCount]);
+
   // Get featured products (first 8)
   const featuredProducts = products.slice(0, 8);
-  
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div key={index} className="animate-pulse">
+            <div className="bg-gray-300 h-48 rounded-md mb-2"></div>
+            <div className="bg-gray-300 h-4 w-3/4 rounded mb-2"></div>
+            <div className="bg-gray-300 h-4 w-1/2 rounded mb-2"></div>
+            <div className="bg-gray-300 h-10 rounded mt-4"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6">
+        <h3 className="font-medium">Unable to load products</h3>
+        <p className="text-sm mt-1">We're having trouble loading our featured products.</p>
+        <button 
+          onClick={() => {
+            dispatch(clearProductError());
+            setRetryCount(prev => prev + 1);
+          }}
+          className="mt-2 text-sm font-medium text-red-700 underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (featuredProducts.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-500">No featured products available at the moment.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {featuredProducts.map((product) => (
+        <ProductCard key={product.id} product={product} />
+      ))}
+    </div>
+  );
+};
+
+const HomePage: React.FC = () => {
   return (
     <div className="pb-16">
       {/* Hero section */}
@@ -101,24 +163,16 @@ const HomePage: React.FC = () => {
           </Link>
         </div>
         
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="animate-pulse">
-                <div className="bg-gray-300 h-48 rounded-md mb-2"></div>
-                <div className="bg-gray-300 h-4 w-3/4 rounded mb-2"></div>
-                <div className="bg-gray-300 h-4 w-1/2 rounded mb-2"></div>
-                <div className="bg-gray-300 h-10 rounded mt-4"></div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
+        <ErrorBoundary 
+          fallback={
+            <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+              <h3 className="text-red-800 font-medium">Something went wrong</h3>
+              <p className="text-red-700 mt-1">We're having trouble displaying products right now.</p>
+            </div>
+          }
+        >
+          <FeaturedProducts />
+        </ErrorBoundary>
       </div>
       
       {/* Call to action section */}

@@ -61,6 +61,11 @@ const ProductDetailPage: React.FC = () => {
     );
   }
   
+  // Determine if product is in stock based on quantity
+  const inStock = product.inStock !== undefined 
+    ? product.inStock 
+    : (product.quantity > 0);
+  
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <button 
@@ -94,13 +99,16 @@ const ProductDetailPage: React.FC = () => {
             
             <div className="mt-2">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                product.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
               }`}>
-                {product.inStock ? 'In Stock' : 'Out of Stock'}
+                {inStock ? 'In Stock' : 'Out of Stock'}
               </span>
-              <span className="inline-flex items-center ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                {product.category}
-              </span>
+              
+              {product.category && (
+                <span className="inline-flex items-center ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {product.category.name}
+                </span>
+              )}
             </div>
           </div>
           
@@ -115,11 +123,11 @@ const ProductDetailPage: React.FC = () => {
             <Button
               onClick={handleAddToCart}
               fullWidth
-              disabled={!product.inStock}
+              disabled={!inStock}
               className="flex items-center justify-center"
             >
               <ShoppingCart className="h-5 w-5 mr-2" />
-              {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+              {inStock ? 'Add to Cart' : 'Out of Stock'}
             </Button>
           </div>
         </div>

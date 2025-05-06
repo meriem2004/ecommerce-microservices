@@ -9,7 +9,7 @@ import useAuth from '../../hooks/useAuth';
 import { LoginRequest } from '../../types';
 
 const schema = yup.object({
-  email: yup.string().email('Please enter a valid email').required('Email is required'),
+  username: yup.string().email('Please enter a valid email').required('Email is required'),
   password: yup.string().required('Password is required'),
 }).required();
 
@@ -52,8 +52,8 @@ const LoginPage: React.FC = () => {
             label="Email address"
             type="email"
             autoComplete="email"
-            {...register('email')}
-            error={errors.email?.message}
+            {...(register('username'))} 
+            error={errors.username?.message}
           />
           
           <FormInput

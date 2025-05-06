@@ -36,6 +36,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <p className="mt-2 text-sm text-gray-500 line-clamp-2">
             {product.description}
           </p>
+          {product.category && (
+            <span className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              {product.category.name}
+            </span>
+          )}
         </div>
       </Link>
       <div className="p-4 pt-0">
