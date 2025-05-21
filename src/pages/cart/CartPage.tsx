@@ -1,4 +1,5 @@
-import React from 'react';
+// src/pages/cart/CartPage.tsx
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 import CartItemRow from '../../components/cart/CartItemRow';
@@ -7,9 +8,26 @@ import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
 
 const CartPage: React.FC = () => {
-  const { items, getCartTotal, emptyCart } = useCart();
+  const { 
+    items, 
+    loading, 
+    error, 
+    getCartTotal, 
+    emptyCart, 
+    refreshCart,
+    updateQuantity, 
+    removeFromCart 
+  } = useCart();
+  
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  
+  // Refresh cart data when the component mounts or authentication state changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshCart();
+    }
+  }, [isAuthenticated]);
   
   const handleCheckout = () => {
     if (!isAuthenticated) {
@@ -19,6 +37,28 @@ const CartPage: React.FC = () => {
       navigate('/checkout');
     }
   };
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6">
+        <h3 className="font-medium">Error loading cart</h3>
+        <p className="text-sm mt-1">{error}</p>
+        <p className="mt-3">
+          <Link to="/products" className="text-blue-600 hover:underline">
+            Continue shopping
+          </Link>
+        </p>
+      </div>
+    );
+  }
   
   if (items.length === 0) {
     return (
@@ -37,6 +77,17 @@ const CartPage: React.FC = () => {
     <div className="pb-16">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
       
+      {/* Connection status indicator */}
+      {isAuthenticated ? (
+        <div className="mb-4 text-sm text-green-600 bg-green-50 rounded-md px-3 py-2 inline-block">
+          ✓ Connected to your account
+        </div>
+      ) : (
+        <div className="mb-4 text-sm text-yellow-600 bg-yellow-50 rounded-md px-3 py-2 inline-block">
+          ℹ Using local cart - <Link to="/login" className="underline">login</Link> to sync with your account
+        </div>
+      )}
+      
       <div className="lg:grid lg:grid-cols-3 lg:gap-x-8">
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6 lg:mb-0">
@@ -47,8 +98,58 @@ const CartPage: React.FC = () => {
               
               <ul className="divide-y divide-gray-200">
                 {items.map((item) => (
-                  <li key={item.id}>
-                    <CartItemRow item={item} />
+                  <li key={item.id || `${item.productId}-${item.name}`} className="py-4">
+                    <div className="flex items-center space-x-4">
+                      {/* Product image */}
+                      <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-gray-100">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="h-full w-full bg-gray-200 flex items-center justify-center text-gray-500">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Product details */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-medium text-gray-900 truncate">{item.name}</h3>
+                        <p className="text-sm text-gray-500">Price: ${item.price.toFixed(2)}</p>
+                      </div>
+                      
+                      {/* Quantity controls */}
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => updateQuantity(item.productId.toString(), Math.max(1, item.quantity - 1))}
+                          className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition"
+                          disabled={item.quantity <= 1}
+                        >
+                          <span className="sr-only">Decrease</span>
+                          <span className="block h-5 w-5 text-center font-bold">-</span>
+                        </button>
+                        
+                        <span className="text-gray-700 w-8 text-center">{item.quantity}</span>
+                        
+                        <button 
+                          onClick={() => updateQuantity(item.productId.toString(), item.quantity + 1)}
+                          className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition"
+                        >
+                          <span className="sr-only">Increase</span>
+                          <span className="block h-5 w-5 text-center font-bold">+</span>
+                        </button>
+                      </div>
+                      
+                      {/* Total and remove */}
+                      <div className="text-right">
+                        <p className="text-base font-medium text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
+                        <button 
+                          onClick={() => removeFromCart(item.productId.toString())}
+                          className="text-sm text-red-600 hover:text-red-500 mt-1"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>

@@ -38,8 +38,29 @@ const cartSlice = createSlice({
       cartService.clearCart();
       state.items = [];
     },
+    // Add a new action to set cart items from the backend
+    setCartItems: (state, action: PayloadAction<CartItem[]>) => {
+      state.items = action.payload;
+      // Also update local storage for offline access
+      cartService.saveCartItems(action.payload);
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+    }
   },
 });
 
-export const { addItem, updateItemQuantity, removeItem, clearCart } = cartSlice.actions;
+export const { 
+  addItem, 
+  updateItemQuantity, 
+  removeItem, 
+  clearCart, 
+  setCartItems,
+  setLoading,
+  setError 
+} = cartSlice.actions;
+
 export default cartSlice.reducer;

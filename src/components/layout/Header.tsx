@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, User, Search } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
+import { STORAGE_KEYS } from '../../config';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -10,6 +11,44 @@ const Header: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const { getItemCount } = useCart();
   const navigate = useNavigate();
+  
+  // Direct authentication check from localStorage
+  const [localAuth, setLocalAuth] = useState({
+    isAuthenticated: false,
+    user: null
+  });
+  
+  // Check authentication status directly from localStorage
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+      let userData = null;
+      
+      if (userStr) {
+        try {
+          userData = JSON.parse(userStr);
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+      
+      setLocalAuth({
+        isAuthenticated: !!token && !!userData,
+        user: userData
+      });
+    };
+    
+    // Check on mount and whenever localStorage might change
+    checkAuth();
+    
+    // Listen for storage events (in case another tab changes localStorage)
+    window.addEventListener('storage', checkAuth);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+    };
+  }, []);
   
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -22,6 +61,31 @@ const Header: React.FC = () => {
       setSearchTerm('');
     }
   };
+
+  const handleLogout = () => {
+    // Clear localStorage directly
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    
+    // Also use the hook's logout if available
+    if (logout) {
+      logout();
+    }
+    
+    // Update local state
+    setLocalAuth({
+      isAuthenticated: false,
+      user: null
+    });
+    
+    setIsMenuOpen(false);
+    navigate('/');
+  };
+
+  // Use either the hook's authentication state or our direct localStorage check
+  const effectiveIsAuthenticated = isAuthenticated || localAuth.isAuthenticated;
+  const effectiveUser = user || localAuth.user;
 
   return (
     <header className="bg-white shadow-md">
@@ -72,7 +136,7 @@ const Header: React.FC = () => {
               )}
             </Link>
             
-            {isAuthenticated ? (
+            {effectiveIsAuthenticated ? (
               <div className="ml-3 relative">
                 <div>
                   <button
@@ -87,19 +151,24 @@ const Header: React.FC = () => {
                 {isMenuOpen && (
                   <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-10">
                     <div className="px-4 py-2 text-xs text-gray-500">
-                      Signed in as <span className="font-semibold">{user?.email}</span>
+                      Signed in as <span className="font-semibold">{effectiveUser?.email}</span>
                     </div>
-                    <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    <Link 
+                      to="/profile" 
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
                       Profile
                     </Link>
-                    <Link to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    <Link 
+                      to="/orders" 
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
                       Orders
                     </Link>
                     <button
-                      onClick={() => {
-                        logout();
-                        setIsMenuOpen(false);
-                      }}
+                      onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       Sign out
@@ -149,7 +218,7 @@ const Header: React.FC = () => {
             >
               Products
             </Link>
-            {!isAuthenticated && (
+            {!effectiveIsAuthenticated && (
               <Link
                 to="/login"
                 className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
@@ -158,7 +227,7 @@ const Header: React.FC = () => {
                 Sign in
               </Link>
             )}
-            {isAuthenticated && (
+            {effectiveIsAuthenticated && (
               <>
                 <Link
                   to="/profile"
@@ -175,10 +244,7 @@ const Header: React.FC = () => {
                   Orders
                 </Link>
                 <button
-                  onClick={() => {
-                    logout();
-                    setIsMenuOpen(false);
-                  }}
+                  onClick={handleLogout}
                   className="block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
                 >
                   Sign out

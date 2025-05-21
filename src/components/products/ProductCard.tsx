@@ -1,9 +1,9 @@
+// src/components/products/ProductCard.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
-import Button from '../common/Button';
-import useCart from '../../hooks/useCart';
 import { Product } from '../../types';
+import useCart from '../../hooks/useCart';
 
 interface ProductCardProps {
   product: Product;
@@ -11,54 +11,68 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
-  
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addToCart(product, 1);
+
+  // Ensure product is valid to prevent errors
+  if (!product || typeof product !== 'object') {
+    console.error('Invalid product data received:', product);
+    return null;
+  }
+
+  const handleAddToCart = () => {
+    addToCart({
+      productId: product.id.toString(),
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      imageUrl: product.imageUrl
+    });
   };
 
   return (
-    <div className="group relative bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg">
-      <Link to={`/products/${product.id}`} className="block">
-        <div className="aspect-w-1 aspect-h-1 w-full overflow-hidden bg-gray-200 xl:aspect-w-7 xl:aspect-h-8">
-          <img
-            src={product.imageUrl || 'https://via.placeholder.com/300'}
-            alt={product.name}
-            className="h-48 w-full object-cover object-center group-hover:opacity-75 transition-opacity"
-          />
-        </div>
-        <div className="p-4">
-          <h3 className="text-sm font-medium text-gray-900">{product.name}</h3>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
-            ${product.price.toFixed(2)}
-          </p>
-          <p className="mt-2 text-sm text-gray-500 line-clamp-2">
-            {product.description}
-          </p>
-          {product.category && (
-            <span className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {product.category.name}
-            </span>
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 hover:shadow-md transition-shadow">
+      <Link to={`/products/${product.id}`}>
+        <div className="h-48 overflow-hidden">
+          {product.imageUrl ? (
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
+              No image
+            </div>
           )}
         </div>
       </Link>
-      <div className="p-4 pt-0">
-        <Button 
+      <div className="p-4">
+        <Link to={`/products/${product.id}`}>
+          <h3 className="text-lg font-medium text-gray-900 truncate">{product.name}</h3>
+        </Link>
+        <p className="mt-1 text-sm text-gray-500 line-clamp-2">{product.description}</p>
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-lg font-semibold text-gray-900">${product.price?.toFixed(2) ?? 'N/A'}</p>
+          
+          {/* Show out of stock label if no quantity */}
+          {(!product.quantity || product.quantity <= 0) && (
+            <span className="px-2 py-1 text-xs text-red-600 bg-red-100 rounded-md">
+              Out of stock
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
           onClick={handleAddToCart}
-          fullWidth
-          size="sm"
-          className="mt-2 transition-all duration-300"
+          disabled={!product.quantity || product.quantity <= 0}
+          className={`mt-4 w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+            ${(!product.quantity || product.quantity <= 0) 
+              ? 'bg-gray-300 cursor-not-allowed' 
+              : 'bg-blue-600 hover:bg-blue-700'}`}
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
-          Add to Cart
-        </Button>
+          Add to cart
+        </button>
       </div>
-      {!product.inStock && (
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
-          Out of Stock
-        </div>
-      )}
     </div>
   );
 };

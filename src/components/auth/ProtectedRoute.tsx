@@ -1,14 +1,21 @@
+// src/components/auth/ProtectedRoute.tsx - Simplified version
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import useAuth from '../../hooks/useAuth';
+import { Navigate, Outlet } from 'react-router-dom';
+import { STORAGE_KEYS } from '../../config';
 
 const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  const location = useLocation();
+  // The simplest possible auth check - just look for token in localStorage
+  const isAuthenticated = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  
+  // Log for debugging
+  console.log('ProtectedRoute - Auth check:', { 
+    isAuthenticated, 
+    hasToken: !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
+  });
 
   if (!isAuthenticated) {
-    // Redirect to login with return URL
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Only redirect if accessing a protected route
+    return <Navigate to="/login" replace />;
   }
 
   return <Outlet />;

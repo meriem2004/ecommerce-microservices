@@ -1,25 +1,59 @@
-// src/pages/HomePage.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Truck, CreditCard, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Truck, CreditCard, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import { fetchProducts, clearProductError } from '../store/productSlice';
 import ProductCard from '../components/products/ProductCard';
 import Button from '../components/common/Button';
 import ErrorBoundary from '../components/common/ErrorBoundary';
+import { API_BASE_URL } from '../config';
 
 const FeaturedProducts: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { products, loading, error } = useSelector((state: RootState) => state.products);
   const [retryCount, setRetryCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        await dispatch(fetchProducts()).unwrap();
+        setDebugInfo({ 
+          status: 'loading', 
+          timestamp: new Date().toISOString(),
+          apiUrl: `${API_BASE_URL}/api/products`,
+          authStatus: localStorage.getItem('auth_token') ? 'authenticated' : 'not authenticated'
+        });
+        
+        console.log(`Dispatching fetchProducts, attempt #${retryCount + 1}`);
+        const resultAction = await dispatch(fetchProducts());
+        
+        if (fetchProducts.fulfilled.match(resultAction)) {
+          setDebugInfo({ 
+            status: 'success', 
+            timestamp: new Date().toISOString(),
+            count: resultAction.payload.length,
+            firstProduct: resultAction.payload[0] || 'none',
+            authStatus: localStorage.getItem('auth_token') ? 'authenticated' : 'not authenticated'
+          });
+          console.log('Products fetched successfully:', resultAction.payload);
+        } else {
+          setDebugInfo({ 
+            status: 'failed', 
+            timestamp: new Date().toISOString(),
+            error: resultAction.error,
+            authStatus: localStorage.getItem('auth_token') ? 'authenticated' : 'not authenticated'
+          });
+          console.error('Failed to fetch products:', resultAction.error);
+        }
       } catch (err) {
         console.error('Error loading featured products:', err);
+        setDebugInfo({ 
+          status: 'exception', 
+          timestamp: new Date().toISOString(),
+          error: err,
+          authStatus: localStorage.getItem('auth_token') ? 'authenticated' : 'not authenticated'
+        });
       }
     };
 
@@ -47,38 +81,119 @@ const FeaturedProducts: React.FC = () => {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6">
-        <h3 className="font-medium">Unable to load products</h3>
-        <p className="text-sm mt-1">We're having trouble loading our featured products.</p>
-        <button 
-          onClick={() => {
-            dispatch(clearProductError());
-            setRetryCount(prev => prev + 1);
-          }}
-          className="mt-2 text-sm font-medium text-red-700 underline"
-        >
-          Try again
-        </button>
+        <h3 className="font-medium flex items-center">
+          <AlertTriangle className="h-5 w-5 mr-2" />
+          Unable to load products
+        </h3>
+        <p className="text-sm mt-1">Error: {error}</p>
+        <div className="mt-2 text-xs bg-red-100 p-2 rounded overflow-auto max-h-32">
+          <p className="font-medium">Debug Information:</p>
+          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+          <p className="mt-1">API URL: {API_BASE_URL}/api/products</p>
+          <p>Auth Status: {localStorage.getItem('auth_token') ? 'Logged in' : 'Not logged in'}</p>
+        </div>
+        <div className="mt-4 flex space-x-4">
+          <button 
+            onClick={() => {
+              dispatch(clearProductError());
+              setRetryCount(prev => prev + 1);
+            }}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
+          >
+            Retry Loading
+          </button>
+          
+          <button
+            onClick={() => {
+              // Direct fetch for debugging
+              fetch(`${API_BASE_URL}/api/products`, {
+                credentials: 'omit' // Don't send auth credentials
+              })
+                .then(res => {
+                  setDebugInfo({
+                    ...debugInfo,
+                    directFetch: {
+                      status: res.status,
+                      ok: res.ok,
+                      statusText: res.statusText
+                    }
+                  });
+                  return res.json();
+                })
+                .then(data => {
+                  setDebugInfo({
+                    ...debugInfo,
+                    directFetch: {
+                      ...debugInfo?.directFetch,
+                      dataCount: Array.isArray(data) ? data.length : 'not an array',
+                      data: Array.isArray(data) ? data.slice(0, 2) : data
+                    }
+                  });
+                })
+                .catch(err => {
+                  setDebugInfo({
+                    ...debugInfo,
+                    directFetch: {
+                      ...debugInfo?.directFetch,
+                      error: err.message
+                    }
+                  });
+                });
+            }}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+          >
+            Test Direct Fetch
+          </button>
+        </div>
       </div>
     );
   }
 
   if (featuredProducts.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">No featured products available at the moment.</p>
+      <div className="text-center py-8 border border-yellow-200 bg-yellow-50 rounded-lg">
+        <p className="text-yellow-700">No featured products available at the moment.</p>
+        <div className="mt-2 text-xs bg-yellow-100 p-2 rounded overflow-auto max-h-32 mx-auto max-w-lg">
+          <p className="font-medium">Debug Information:</p>
+          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+          <p className="mt-1">API URL: {API_BASE_URL}/api/products</p>
+          <p>Products array length: {products.length}</p>
+        </div>
+        <button 
+          onClick={() => {
+            dispatch(clearProductError());
+            setRetryCount(prev => prev + 1);
+          }}
+          className="mt-4 px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded hover:bg-yellow-700"
+        >
+          Retry Loading Products
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {featuredProducts.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
+    <div>
+      {/* Show debug info for development only */}
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="mb-4 p-2 bg-green-100 text-green-800 text-xs rounded">
+          <p className="font-medium">Products loaded: {products.length}</p>
+          <p>API URL: {API_BASE_URL}/api/products</p>
+          <p>Auth Status: {localStorage.getItem('auth_token') ? 'Logged in' : 'Not logged in'}</p>
+          <pre className="overflow-auto max-h-20 mt-1">{JSON.stringify(debugInfo, null, 2)}</pre>
+        </div>
+      )}
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {featuredProducts.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
     </div>
   );
 };
 
+// Rest of the HomePage component remains unchanged
 const HomePage: React.FC = () => {
   return (
     <div className="pb-16">

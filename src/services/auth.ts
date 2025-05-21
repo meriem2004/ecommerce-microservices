@@ -1,11 +1,10 @@
 // src/services/auth.ts
 import axios from 'axios';
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '../types';
+import { STORAGE_KEYS } from '../config';
 
-const API_BASE_URL = 'http://localhost:8086'; // Updated to match your backend port
-const AUTH_TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const USER_KEY = 'user_data';
+// Change this to use API Gateway instead of direct service
+const API_BASE_URL = 'http://localhost:8080';  // API Gateway port
 
 // Enable verbose logging for debugging
 const DEBUG = true;
@@ -13,25 +12,41 @@ const DEBUG = true;
 // Set auth token for every request
 const setAuthToken = (token: string | null) => {
   if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    if (DEBUG) console.log('Auth token set in headers and localStorage');
+    // Only add 'Bearer ' prefix if it's not already there
+    const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    axios.defaults.headers.common['Authorization'] = formattedToken;
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token); // Store without Bearer prefix
+    if (DEBUG) console.log('Auth token set in headers and localStorage:', {
+      header: formattedToken,
+      localStorage: token
+    });
   } else {
     delete axios.defaults.headers.common['Authorization'];
-    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     if (DEBUG) console.log('Auth token removed from headers and localStorage');
+  }
+};
+
+// Set user data in localStorage
+const setUserData = (user: User | null) => {
+  if (user) {
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    if (DEBUG) console.log('User data stored in localStorage:', user);
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.USER);
+    if (DEBUG) console.log('User data removed from localStorage');
   }
 };
 
 // Get current user from localStorage
 export const getCurrentUser = (): User | null => {
-  const userData = localStorage.getItem(USER_KEY);
+  const userData = localStorage.getItem(STORAGE_KEYS.USER);
   if (userData) {
     try {
       return JSON.parse(userData);
     } catch (error) {
       if (DEBUG) console.error('Error parsing user data from localStorage:', error);
-      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(STORAGE_KEYS.USER);
       return null;
     }
   }
@@ -40,7 +55,11 @@ export const getCurrentUser = (): User | null => {
 
 // Check if user is authenticated
 export const isAuthenticated = (): boolean => {
-  return localStorage.getItem(AUTH_TOKEN_KEY) !== null;
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  const user = getCurrentUser();
+  const isAuth = token !== null && user !== null;
+  if (DEBUG) console.log('isAuthenticated check:', { hasToken: !!token, hasUser: !!user, isAuth });
+  return isAuth;
 };
 
 // Register new user
@@ -55,13 +74,16 @@ export const register = async (userData: RegisterRequest): Promise<AuthResponse>
     
     // Store token and user data
     setAuthToken(token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setUserData(user);
     
     // Also store refresh token if available
     if (refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
       if (DEBUG) console.log('Refresh token stored in localStorage');
     }
+    
+    // Add a deliberate delay to ensure localStorage is updated before navigation
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     return response.data;
   } catch (error: any) {
@@ -92,13 +114,23 @@ export const login = async (credentials: LoginRequest): Promise<AuthResponse> =>
     const { token, refreshToken, user } = response.data;
     
     // Store token and user data
-    setAuthToken(token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setAuthToken(token); // This will add the 'Bearer ' prefix if needed
+    setUserData(user);
     
     // Also store refresh token if available
     if (refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
       if (DEBUG) console.log('Refresh token stored in localStorage');
+    }
+    
+    // Add a deliberate delay to ensure localStorage is updated before navigation
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Verification log - this should show 'Bearer TOKEN' not just 'TOKEN'
+    if (DEBUG) {
+      console.log('Authorization header after login:', axios.defaults.headers.common['Authorization']);
+      console.log('Token in localStorage:', localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN));
+      console.log('User in localStorage:', localStorage.getItem(STORAGE_KEYS.USER));
     }
     
     return response.data;
@@ -115,7 +147,7 @@ export const login = async (credentials: LoginRequest): Promise<AuthResponse> =>
 
 // Refresh token
 export const refreshToken = async (): Promise<string | null> => {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
   
   if (!refreshToken) {
     if (DEBUG) console.log('No refresh token found in localStorage');
@@ -137,11 +169,11 @@ export const refreshToken = async (): Promise<string | null> => {
     if (DEBUG) console.log('Token refresh successful, new token received');
     
     const newToken = response.data.token;
-    setAuthToken(newToken);
+    setAuthToken(newToken); // This adds the 'Bearer ' prefix
     
     // Update refresh token if a new one is provided
     if (response.data.refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, response.data.refreshToken);
+      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
       if (DEBUG) console.log('New refresh token stored in localStorage');
     }
     
@@ -163,8 +195,9 @@ export const refreshToken = async (): Promise<string | null> => {
 export const logout = (): void => {
   if (DEBUG) console.log('Logging out user');
   setAuthToken(null);
-  localStorage.removeItem(USER_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  setUserData(null);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.CART);
 };
 
 // Setup interceptor to handle token refresh
@@ -212,9 +245,10 @@ export const setupAxiosInterceptors = () => {
 
 // Load token on app start
 export const loadToken = (): void => {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   if (token) {
     if (DEBUG) console.log('Found existing token in localStorage, setting in headers');
+    // Make sure the Bearer prefix is added
     setAuthToken(token);
   }
   setupAxiosInterceptors();

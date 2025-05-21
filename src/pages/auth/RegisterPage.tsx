@@ -7,7 +7,8 @@ import FormInput from '../../components/common/FormInput';
 import Button from '../../components/common/Button';
 import useAuth from '../../hooks/useAuth';
 import { RegisterRequest } from '../../types';
-import axios from 'axios';
+import { useDispatch } from 'react-redux';
+import { fetchProducts } from '../../store/productSlice';
 
 const schema = yup.object({
   firstName: yup.string().required('First name is required'),
@@ -24,8 +25,8 @@ const schema = yup.object({
 const RegisterPage: React.FC = () => {
   const { register: registerUser, loading } = useAuth();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [error, setError] = useState<string | null>(null);
-  const [debugResponse, setDebugResponse] = useState<any>(null);
   
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterRequest & { confirmPassword: string }>({
     resolver: yupResolver(schema),
@@ -37,22 +38,16 @@ const RegisterPage: React.FC = () => {
       // Remove confirmPassword from the data
       const { confirmPassword, ...registerData } = data;
       
-      // Use direct axios call for debugging purposes
-      try {
-        console.log('Sending registration data:', registerData);
-        const response = await axios.post('http://localhost:8086/api/auth/register', registerData);
-        console.log('Registration success response:', response.data);
-        setDebugResponse(response.data);
-        
-        // Now use the auth hook
-        await registerUser(registerData);
-        navigate('/');
-      } catch (axiosErr: any) {
-        console.error('Direct registration failed:', axiosErr.response?.data || axiosErr.message);
-        setError(axiosErr.response?.data?.message || 'Registration failed. Please try again.');
-        setDebugResponse(axiosErr.response?.data);
-        throw axiosErr;
-      }
+      // Use the auth hook directly - no need for separate axios call
+      await registerUser(registerData);
+      
+      // Explicitly trigger product fetch after registration
+      console.log('Registration successful, refreshing products');
+      setTimeout(() => {
+        dispatch(fetchProducts());
+      }, 100);
+      
+      navigate('/');
     } catch (err: any) {
       console.error('Registration error:', err);
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
@@ -69,13 +64,6 @@ const RegisterPage: React.FC = () => {
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
             {error}
-          </div>
-        )}
-
-        {debugResponse && (
-          <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-md text-sm overflow-auto max-h-40">
-            <p>Debug response (will be removed in production):</p>
-            <pre>{JSON.stringify(debugResponse, null, 2)}</pre>
           </div>
         )}
         

@@ -1,3 +1,4 @@
+// src/App.tsx - Updated with ProfilePage
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -19,6 +20,7 @@ import CartPage from './pages/cart/CartPage';
 
 // Pages - Protected
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import ProfilePage from './pages/ProfilePage'; // Import the profile page
 
 function App() {
   return (
@@ -39,9 +41,10 @@ function App() {
             <Route path="/products/:id" element={<ProductDetailPage />} />
             <Route path="/cart" element={<CartPage />} />
 
-            {/* Protected Routes */}
+            {/* Protected Routes should go inside ProtectedRoute */}
             <Route element={<ProtectedRoute />}>
-              {/* Add protected routes here */}
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/orders" element={<ProductListingPage />} /> {/* You can replace this with an actual OrdersPage when available */}
             </Route>
 
             {/* Fallback route */}

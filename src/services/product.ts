@@ -1,8 +1,7 @@
 // src/services/product.ts
 import axios from 'axios';
 import { Product } from '../types';
-
-const API_BASE_URL = 'http://localhost:8081'; // Your API gateway URL
+import { API_BASE_URL } from '../config';
 
 // Helper function to format error messages
 const formatErrorMessage = (error: any): string => {
@@ -21,16 +20,37 @@ const formatErrorMessage = (error: any): string => {
   }
 };
 
+// Create a separate axios instance for product requests WITHOUT any auth headers
+// This is crucial - we create a fresh instance that never inherits headers from the main axios
+const publicApi = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
+
 /**
  * Get all products
  * @returns Promise with array of products
  */
 export const getProducts = async (): Promise<Product[]> => {
   try {
-    const response = await axios.get<Product[]>(`${API_BASE_URL}/api/products`);
+    console.log('Fetching products from:', `${API_BASE_URL}/api/products`);
+    
+    // Use the separate publicApi instance that never has auth headers
+    const response = await publicApi.get<Product[]>('/api/products');
+    console.log(`Fetched ${response.data.length} products successfully`);
     return response.data;
   } catch (error) {
     console.error('Error fetching products:', error);
+    
+    // Try to get more information about the error
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+      console.error('Response headers:', error.response.headers);
+    }
+    
     throw new Error(formatErrorMessage(error));
   }
 };
@@ -42,7 +62,11 @@ export const getProducts = async (): Promise<Product[]> => {
  */
 export const getProductById = async (id: string): Promise<Product> => {
   try {
-    const response = await axios.get<Product>(`${API_BASE_URL}/api/products/${id}`);
+    console.log('Fetching product details for ID:', id);
+    
+    // Use the separate publicApi instance
+    const response = await publicApi.get<Product>(`/api/products/${id}`);
+    console.log('Product fetched successfully:', response.data.name);
     return response.data;
   } catch (error) {
     console.error(`Error fetching product with id ${id}:`, error);
@@ -50,38 +74,13 @@ export const getProductById = async (id: string): Promise<Product> => {
   }
 };
 
-/**
- * Search for products by name or description
- * @param searchTerm - Search query
- * @returns Promise with array of matching products
- */
-export const searchProducts = async (searchTerm: string): Promise<Product[]> => {
-  try {
-    const response = await axios.get<Product[]>(
-      `${API_BASE_URL}/api/products/search?term=${encodeURIComponent(searchTerm)}`
-    );
-    return response.data;
-  } catch (error) {
-    console.error(`Error searching products with term ${searchTerm}:`, error);
-    throw new Error(formatErrorMessage(error));
-  }
-};
-
-/**
- * Get all products in a specific category
- * @param categoryId - Category ID
- * @returns Promise with array of products in the category
- */
-export const getProductsByCategory = async (categoryId: string): Promise<Product[]> => {
-  try {
-    const response = await axios.get<Product[]>(
-      `${API_BASE_URL}/api/products/category/${categoryId}`
-    );
-    return response.data;
-  } catch (error) {
-    console.error(`Error fetching products for category ${categoryId}:`, error);
-    throw new Error(formatErrorMessage(error));
-  }
+// For admin operations, create a different axios instance with auth headers
+const createAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token');
+  // Make sure to add the Bearer prefix
+  return {
+    'Authorization': token ? `Bearer ${token}` : ''
+  };
 };
 
 /**
@@ -91,15 +90,17 @@ export const getProductsByCategory = async (categoryId: string): Promise<Product
  */
 export const createProduct = async (productData: Omit<Product, 'id'>): Promise<Product> => {
   try {
+    // Log the auth header being used
+    console.log('Creating product with auth header:', createAuthHeaders());
+    
     const response = await axios.post<Product>(
       `${API_BASE_URL}/api/products`,
       productData,
       {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: createAuthHeaders()
       }
     );
+    console.log('Product created successfully:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error creating product:', error);
@@ -115,15 +116,17 @@ export const createProduct = async (productData: Omit<Product, 'id'>): Promise<P
  */
 export const updateProduct = async (id: string, productData: Partial<Product>): Promise<Product> => {
   try {
+    // Log the auth header being used
+    console.log('Updating product with auth header:', createAuthHeaders());
+    
     const response = await axios.put<Product>(
       `${API_BASE_URL}/api/products/${id}`,
       productData,
       {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: createAuthHeaders()
       }
     );
+    console.log('Product updated successfully:', response.data);
     return response.data;
   } catch (error) {
     console.error(`Error updating product with id ${id}:`, error);
@@ -138,40 +141,18 @@ export const updateProduct = async (id: string, productData: Partial<Product>): 
  */
 export const deleteProduct = async (id: string): Promise<void> => {
   try {
+    // Log the auth header being used
+    console.log('Deleting product with auth header:', createAuthHeaders());
+    
     await axios.delete(
-      `${API_BASE_URL}/api/products/${id}/delete`,
+      `${API_BASE_URL}/api/products/${id}`,
       {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: createAuthHeaders()
       }
     );
+    console.log('Product deleted successfully');
   } catch (error) {
     console.error(`Error deleting product with id ${id}:`, error);
-    throw new Error(formatErrorMessage(error));
-  }
-};
-
-/**
- * Update product stock (admin only)
- * @param id - Product ID
- * @param quantity - New stock quantity
- * @returns Promise with the updated product
- */
-export const updateProductStock = async (id: string, quantity: number): Promise<Product> => {
-  try {
-    const response = await axios.put<Product>(
-      `${API_BASE_URL}/api/products/${id}/stock`,
-      { quantity },
-      {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error(`Error updating stock for product ${id}:`, error);
     throw new Error(formatErrorMessage(error));
   }
 };

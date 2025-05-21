@@ -1,4 +1,5 @@
-// src/types/index.ts
+// Update to src/types/index.ts - adding cart related types
+
 // User related interfaces
 export interface User {
   id: string | number;
@@ -64,4 +65,38 @@ export interface Product {
   inStock?: boolean;
   imageUrl?: string;
   category?: Category;
+}
+
+// Cart related interfaces
+export interface CartItem {
+  id?: number | string;  // Backend ID for the cart item
+  productId: string | number;
+  name: string;
+  price: number;
+  quantity: number;
+  imageUrl?: string;
+}
+
+export interface CartResponse {
+  id: number | string;
+  userId: number | string;
+  items: CartItem[];
+  total: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AddItemRequest {
+  productId: string | number;
+  quantity: number;
+}
+
+export interface UpdateItemRequest {
+  quantity: number;
+}
+
+export interface CheckoutRequest {
+  paymentMethod: string;
+  shippingAddress: string;
+  // Add other checkout fields as needed
 }
