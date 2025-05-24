@@ -1,4 +1,4 @@
-// src/pages/auth/LoginPage.tsx - Direct navigation approach
+// src/pages/auth/LoginPage.tsx
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -9,7 +9,6 @@ import Button from '../../components/common/Button';
 import axios from 'axios';
 import { STORAGE_KEYS } from '../../config';
 
-// Define LoginRequest type if not imported
 interface LoginRequest {
   username: string;
   password: string;
@@ -20,7 +19,6 @@ const schema = yup.object({
   password: yup.string().required('Password is required'),
 }).required();
 
-// Direct login approach without using the complex hooks and Redux
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,46 +34,30 @@ const LoginPage: React.FC = () => {
       setError(null);
       setLoading(true);
       
-      console.log('LoginPage - Directly sending login request');
-      
-      // Direct API call without going through complex services
       const response = await axios.post('http://localhost:8080/api/auth/login', {
         email: data.username,
         password: data.password
       });
       
-      console.log('Login response:', response.data);
-      
-      // Store token in localStorage
+      // Store authentication data
       if (response.data.token) {
         localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.data.token);
-        
-        // Also set the Authorization header for subsequent requests
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
       }
       
-      // Store user data
       if (response.data.user) {
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.user));
       }
       
-      // Store refresh token if available
       if (response.data.refreshToken) {
         localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
       }
       
-      console.log('Auth data stored in localStorage');
-      console.log('Token in localStorage:', Boolean(localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)));
-      console.log('User in localStorage:', Boolean(localStorage.getItem(STORAGE_KEYS.USER)));
-      
-      // Get the return URL from location state, or default to home page
+      // Get redirect path or default to home
       const from = (location.state as any)?.from?.pathname || '/';
       
-      // Navigate after a small delay to ensure localStorage is updated
-      setTimeout(() => {
-        console.log('Navigating to:', from);
-        navigate(from, { replace: true });
-      }, 100);
+      // Force reload to ensure all auth state is properly initialized
+      window.location.href = from;
       
     } catch (err: any) {
       console.error('Login error:', err);
@@ -103,7 +85,7 @@ const LoginPage: React.FC = () => {
             label="Email address"
             type="email"
             autoComplete="email"
-            {...(register('username'))} 
+            {...register('username')} 
             error={errors.username?.message}
           />
           

@@ -5,7 +5,22 @@ import { STORAGE_KEYS } from '../config';
 
 // Change this to use API Gateway instead of direct service
 const API_BASE_URL = 'http://localhost:8080';  // API Gateway port
+export const verifyToken = async (): Promise<boolean> => {
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  if (!token) return false;
 
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/auth/verify`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return response.status === 200;
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return false;
+  }
+};
 // Enable verbose logging for debugging
 const DEBUG = true;
 
@@ -60,6 +75,12 @@ export const isAuthenticated = (): boolean => {
   const isAuth = token !== null && user !== null;
   if (DEBUG) console.log('isAuthenticated check:', { hasToken: !!token, hasUser: !!user, isAuth });
   return isAuth;
+};
+
+// Forcefully set authentication - used for persistence
+export const setAuthentication = (token: string, user: User) => {
+  setAuthToken(token);
+  setUserData(user);
 };
 
 // Register new user

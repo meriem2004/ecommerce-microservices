@@ -1,13 +1,20 @@
 // src/pages/cart/CartPage.tsx
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, User } from 'lucide-react';
 import CartItemRow from '../../components/cart/CartItemRow';
 import Button from '../../components/common/Button';
 import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
+import * as authService from '../../services/auth';
 
 const CartPage: React.FC = () => {
+  // State hooks first
+  const [localState, setLocalState] = useState({});
+  
+  // Then other hooks
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const { 
     items, 
     loading, 
@@ -19,19 +26,30 @@ const CartPage: React.FC = () => {
     removeFromCart 
   } = useCart();
   
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  // Add a direct check from localStorage
+  const [directAuthCheck, setDirectAuthCheck] = useState(false);
   
-  // Refresh cart data when the component mounts or authentication state changes
+  // Check authentication directly from localStorage as a fallback
   useEffect(() => {
-    if (isAuthenticated) {
+    const isUserAuthenticated = authService.isAuthenticated();
+    setDirectAuthCheck(isUserAuthenticated);
+  }, []);
+  
+  // Effects after all hooks
+  useEffect(() => {
+    // Use either Redux state or direct localStorage check
+    if (isAuthenticated || directAuthCheck) {
       refreshCart();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, directAuthCheck, refreshCart]);
+  
+  // Use either Redux state or direct localStorage check for authentication
+  const effectiveIsAuthenticated = isAuthenticated || directAuthCheck;
+  const effectiveUser = user || authService.getCurrentUser();
   
   const handleCheckout = () => {
-    if (!isAuthenticated) {
-      // Redirect to login if not authenticated
+    // Check both Redux state and localStorage
+    if (!effectiveIsAuthenticated) {
       navigate('/login', { state: { from: { pathname: '/checkout' } } });
     } else {
       navigate('/checkout');
@@ -62,13 +80,43 @@ const CartPage: React.FC = () => {
   
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 text-center py-16">
-        <ShoppingBag className="h-16 w-16 mx-auto text-gray-400" />
-        <h2 className="mt-4 text-2xl font-semibold text-gray-900">Your cart is empty</h2>
-        <p className="mt-2 text-gray-500">Looks like you haven't added any products to your cart yet.</p>
-        <Link to="/products">
-          <Button className="mt-6">Continue Shopping</Button>
-        </Link>
+      <div className="pb-16">
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
+        
+        {effectiveIsAuthenticated && effectiveUser && (
+          <div className="mb-6 bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-100 p-3 rounded-full">
+                <User className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">
+                  Hello, {effectiveUser.firstName} {effectiveUser.lastName}
+                </h2>
+                <p className="text-sm text-gray-500">{effectiveUser.email}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {effectiveIsAuthenticated ? (
+          <div className="mb-4 text-sm text-green-600 bg-green-50 rounded-md px-3 py-2 inline-block">
+            ✓ Connected to your account
+          </div>
+        ) : (
+          <div className="mb-4 text-sm text-yellow-600 bg-yellow-50 rounded-md px-3 py-2 inline-block">
+            ℹ Using local cart - <Link to="/login" className="underline">login</Link> to sync with your account
+          </div>
+        )}
+        
+        <div className="bg-white rounded-lg shadow-sm p-6 text-center py-16">
+          <ShoppingBag className="h-16 w-16 mx-auto text-gray-400" />
+          <h2 className="mt-4 text-2xl font-semibold text-gray-900">Your cart is empty</h2>
+          <p className="mt-2 text-gray-500">Looks like you haven't added any products to your cart yet.</p>
+          <Link to="/products">
+            <Button className="mt-6">Continue Shopping</Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -77,8 +125,23 @@ const CartPage: React.FC = () => {
     <div className="pb-16">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
       
-      {/* Connection status indicator */}
-      {isAuthenticated ? (
+      {effectiveIsAuthenticated && effectiveUser && (
+        <div className="mb-6 bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-100 p-3 rounded-full">
+              <User className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium text-gray-900">
+                Hello, {effectiveUser.firstName} {effectiveUser.lastName}
+              </h2>
+              <p className="text-sm text-gray-500">{effectiveUser.email}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {effectiveIsAuthenticated ? (
         <div className="mb-4 text-sm text-green-600 bg-green-50 rounded-md px-3 py-2 inline-block">
           ✓ Connected to your account
         </div>
@@ -100,7 +163,6 @@ const CartPage: React.FC = () => {
                 {items.map((item) => (
                   <li key={item.id || `${item.productId}-${item.name}`} className="py-4">
                     <div className="flex items-center space-x-4">
-                      {/* Product image */}
                       <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-gray-100">
                         {item.imageUrl ? (
                           <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
@@ -111,13 +173,11 @@ const CartPage: React.FC = () => {
                         )}
                       </div>
                       
-                      {/* Product details */}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-base font-medium text-gray-900 truncate">{item.name}</h3>
                         <p className="text-sm text-gray-500">Price: ${item.price.toFixed(2)}</p>
                       </div>
                       
-                      {/* Quantity controls */}
                       <div className="flex items-center space-x-2">
                         <button 
                           onClick={() => updateQuantity(item.productId.toString(), Math.max(1, item.quantity - 1))}
@@ -139,7 +199,6 @@ const CartPage: React.FC = () => {
                         </button>
                       </div>
                       
-                      {/* Total and remove */}
                       <div className="text-right">
                         <p className="text-base font-medium text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
                         <button 

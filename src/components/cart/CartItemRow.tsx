@@ -18,13 +18,13 @@ const CartItemRow: React.FC<CartItemRowProps> = ({ item }) => {
   }
 
   const handleUpdateQuantity = (newQuantity: number) => {
-    if (newQuantity > 0 && item.productId) {
+    if (newQuantity > 0 && item.id && item.productId) {
       updateQuantity(item.productId.toString(), newQuantity);
     }
   };
 
   const handleRemoveItem = () => {
-    if (item.productId) {
+    if (item.id && item.productId) {
       removeFromCart(item.productId.toString());
     }
   };

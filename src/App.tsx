@@ -1,4 +1,4 @@
-// src/App.tsx - Updated with ProfilePage
+// src/App.tsx
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -8,19 +8,15 @@ import { store } from './store';
 import MainLayout from './components/layout/MainLayout';
 import AuthLayout from './components/layout/AuthLayout';
 
-// Pages - Auth
+// Pages
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-
-// Pages - Public
 import HomePage from './pages/HomePage';
 import ProductListingPage from './pages/products/ProductListingPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/cart/CartPage';
-
-// Pages - Protected
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import ProfilePage from './pages/ProfilePage'; // Import the profile page
 
 function App() {
   return (
@@ -39,12 +35,12 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/products" element={<ProductListingPage />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
-            <Route path="/cart" element={<CartPage />} />
 
-            {/* Protected Routes should go inside ProtectedRoute */}
+            {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
+              <Route path="/cart" element={<CartPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/orders" element={<ProductListingPage />} /> {/* You can replace this with an actual OrdersPage when available */}
+              <Route path="/orders" element={<ProductListingPage />} />
             </Route>
 
             {/* Fallback route */}
