@@ -4,27 +4,16 @@ import { Outlet } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import Header from './Header';
 import Footer from './Footer';
-import { STORAGE_KEYS } from '../../config';
-import * as authService from '../../services/auth';
 import { updateAuthState } from '../../store/authSlice';
+import * as authService from '../../services/auth';
 
 const MainLayout: React.FC = () => {
   const dispatch = useDispatch();
   
-  // Initialize auth state and token on layout mount
   useEffect(() => {
-    // Load token on component mount
-    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    if (token) {
-      console.log('MainLayout - Found token in localStorage, setting auth header');
-      // Set auth header for all requests
-      authService.loadToken();
-      
-      // Update Redux auth state to match localStorage
-      dispatch(updateAuthState());
-      
-      console.log('MainLayout - Auth state synced with localStorage');
-    }
+    // Initialize auth state when layout mounts
+    authService.initializeAuth();
+    dispatch(updateAuthState());
   }, [dispatch]);
 
   return (

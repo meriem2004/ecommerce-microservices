@@ -6,9 +6,7 @@ import {
   registerUser, 
   logoutUser,
   clearError,
-  updateAuthState,
-  verifyAuthToken,
-  refreshAuthToken
+  updateAuthState
 } from '../store/authSlice';
 import { LoginRequest, RegisterRequest, AuthResponse } from '../types';
 import { AppDispatch, RootState } from '../store';
@@ -20,25 +18,25 @@ const useAuth = () => {
   const auth = useSelector((state: RootState) => state.auth);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Initialize auth state on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      if (!token) return;
-
       try {
-        // First try to verify the existing token
+        const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        if (!token) return;
+
+        // Verify token and update state
         const isValid = await authService.verifyToken();
         if (isValid) {
           dispatch(updateAuthState());
-          return;
-        }
-
-        // If verification fails, try to refresh the token
-        const newToken = await authService.refreshToken();
-        if (newToken) {
-          dispatch(updateAuthState());
         } else {
-          dispatch(logoutUser());
+          // Try to refresh token if verification fails
+          const newToken = await authService.refreshToken();
+          if (newToken) {
+            dispatch(updateAuthState());
+          } else {
+            dispatch(logoutUser());
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -56,7 +54,6 @@ const useAuth = () => {
       
       const resultAction = await dispatch(loginUser(credentials));
       if (loginUser.fulfilled.match(resultAction)) {
-        await dispatch(verifyAuthToken());
         return resultAction.payload;
       } else {
         throw new Error(resultAction.payload as string || 'Login failed');
@@ -74,7 +71,6 @@ const useAuth = () => {
       
       const resultAction = await dispatch(registerUser(userData));
       if (registerUser.fulfilled.match(resultAction)) {
-        await dispatch(verifyAuthToken());
         return resultAction.payload;
       } else {
         throw new Error(resultAction.payload as string || 'Registration failed');
@@ -96,8 +92,7 @@ const useAuth = () => {
 
   const verifyAuth = async (): Promise<boolean> => {
     try {
-      const result = await dispatch(verifyAuthToken());
-      return verifyAuthToken.fulfilled.match(result);
+      return await authService.verifyToken();
     } catch (error) {
       console.error('Verification error:', error);
       return false;

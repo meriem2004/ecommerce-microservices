@@ -6,10 +6,9 @@ import * as yup from 'yup';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import FormInput from '../../components/common/FormInput';
 import Button from '../../components/common/Button';
-import axios from 'axios';
-import { STORAGE_KEYS } from '../../config';
+import useAuth from '../../hooks/useAuth';
 
-interface LoginRequest {
+interface LoginFormData {
   username: string;
   password: string;
 }
@@ -20,50 +19,32 @@ const schema = yup.object({
 }).required();
 
 const LoginPage: React.FC = () => {
+  const { login, loading, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginRequest>({
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: yupResolver(schema),
   });
   
-  const onSubmit = async (data: LoginRequest) => {
+  const onSubmit = async (data: LoginFormData) => {
     try {
-      setError(null);
-      setLoading(true);
+      setLocalError(null);
       
-      const response = await axios.post('http://localhost:8080/api/auth/login', {
-        email: data.username,
+      // Use the auth hook - it handles everything properly
+      await login({
+        username: data.username, // This will be mapped to email in the auth service
         password: data.password
       });
       
-      // Store authentication data
-      if (response.data.token) {
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.data.token);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-      }
-      
-      if (response.data.user) {
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.user));
-      }
-      
-      if (response.data.refreshToken) {
-        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
-      }
-      
       // Get redirect path or default to home
       const from = (location.state as any)?.from?.pathname || '/';
-      
-      // Force reload to ensure all auth state is properly initialized
-      window.location.href = from;
+      navigate(from);
       
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
+      setLocalError(err.message || 'Login failed. Please check your credentials.');
     }
   };
   
@@ -74,9 +55,9 @@ const LoginPage: React.FC = () => {
           Sign in to your account
         </h2>
         
-        {error && (
+        {(error || localError) && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
-            {error}
+            {localError || error}
           </div>
         )}
         

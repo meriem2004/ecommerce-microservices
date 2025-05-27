@@ -1,3 +1,4 @@
+// src/pages/auth/RegisterPage.tsx
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -7,8 +8,6 @@ import FormInput from '../../components/common/FormInput';
 import Button from '../../components/common/Button';
 import useAuth from '../../hooks/useAuth';
 import { RegisterRequest } from '../../types';
-import { useDispatch } from 'react-redux';
-import { fetchProducts } from '../../store/productSlice';
 
 const schema = yup.object({
   firstName: yup.string().required('First name is required'),
@@ -23,10 +22,9 @@ const schema = yup.object({
 }).required();
 
 const RegisterPage: React.FC = () => {
-  const { register: registerUser, loading } = useAuth();
+  const { register: registerUser, loading, error } = useAuth();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterRequest & { confirmPassword: string }>({
     resolver: yupResolver(schema),
@@ -34,23 +32,13 @@ const RegisterPage: React.FC = () => {
   
   const onSubmit = async (data: RegisterRequest & { confirmPassword: string }) => {
     try {
-      setError(null);
-      // Remove confirmPassword from the data
+      setLocalError(null);
       const { confirmPassword, ...registerData } = data;
       
-      // Use the auth hook directly - no need for separate axios call
       await registerUser(registerData);
-      
-      // Explicitly trigger product fetch after registration
-      console.log('Registration successful, refreshing products');
-      setTimeout(() => {
-        dispatch(fetchProducts());
-      }, 100);
-      
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err: any) {
-      console.error('Registration error:', err);
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      setLocalError(err.message || 'Registration failed. Please try again.');
     }
   };
   
@@ -61,9 +49,9 @@ const RegisterPage: React.FC = () => {
           Create an account
         </h2>
         
-        {error && (
+        {(error || localError) && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
-            {error}
+            {localError || error}
           </div>
         )}
         
