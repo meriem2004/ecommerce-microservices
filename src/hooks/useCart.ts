@@ -1,215 +1,176 @@
 // src/hooks/useCart.ts
-import { useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { 
-  addItem, 
-  updateItemQuantity, 
-  removeItem, 
-  clearCart, 
-  setCartItems,
-  setLoading,
-  setError
-} from '../store/cartSlice';
+import { addItem, updateItemQuantity, removeItem, clearCart, setCartItems } from '../store/cartSlice';
 import { CartItem } from '../types';
-import api from '../services/api';
-import * as authService from '../services/auth';
 
 const useCart = () => {
-  // Redux hooks first
   const dispatch = useDispatch();
-  const { items, loading: cartLoading, error: cartError } = useSelector((state: RootState) => state.cart);
+  const { items } = useSelector((state: RootState) => state.cart);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-  // Then other hooks
-  const fetchCartItems = useCallback(async () => {
-    // Check localStorage directly since redux state might not be updated yet
-    const isUserAuthenticated = authService.isAuthenticated();
-    
-    if (!isUserAuthenticated) {
-      console.log('fetchCartItems: User not authenticated, skipping API call');
-      return;
-    }
-    
-    try {
-      dispatch(setLoading(true));
-      dispatch(setError(null));
-
-      console.log('Fetching cart items - isAuthenticated from localStorage:', isUserAuthenticated);
-      
-      const response = await api.get('/api/carts/current');
-      console.log('Cart items response:', response.data);
-      
-      if (response.data?.items) {
-        dispatch(setCartItems(response.data.items));
-      }
-    } catch (err) {
-      console.error('Failed to load cart items:', err);
-      let errorMessage = 'Failed to load cart items';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      dispatch(setError(errorMessage));
-    } finally {
-      dispatch(setLoading(false));
+  // NO backend calls at all - just use localStorage
+  useEffect(() => {
+    // Load from localStorage only
+    console.log('Loading cart from localStorage only');
+    const savedItems = getCartItemsFromStorage();
+    if (savedItems.length > 0) {
+      dispatch(setCartItems(savedItems));
     }
   }, [dispatch]);
 
-  const addToCart = async (item: CartItem) => {
-    console.log('Adding to cart from useCart hook:', item);
-    
-    // Always add to local cart for immediate feedback
-    dispatch(addItem(item));
-    
-    // Check authentication directly from localStorage to avoid state synchronization issues
-    const isUserAuthenticated = authService.isAuthenticated(); 
-    console.log('Authentication check for addToCart:', { 
-      reduxState: isAuthenticated,
-      localStorage: isUserAuthenticated
-    });
-    
-    // If authenticated, also send to backend
-    if (isUserAuthenticated) {
-      try {
-        dispatch(setLoading(true));
-        
-        // Important: Ensure productId is a number
-        const addItemRequest = {
-          productId: parseInt(item.productId),
-          quantity: item.quantity || 1
-        };
-
-        console.log('Sending cart request to backend:', addItemRequest);
-
-        const response = await api.post('/api/carts/current/items', addItemRequest);
-        
-        console.log('Response from backend:', response.data);
-        
-        if (response.data?.items) {
-          dispatch(setCartItems(response.data.items));
-          console.log('Updated cart items from backend');
-        }
-      } catch (apiError) {
-        console.error('Failed to sync cart with backend:', apiError);
-        dispatch(setError('Failed to sync with server'));
-      } finally {
-        dispatch(setLoading(false));
-      }
-    } else {
-      console.log('Not authenticated, item only added to local cart');
+  // Function to get cart items from local storage
+  const getCartItemsFromStorage = (): CartItem[] => {
+    try {
+      const cartJson = localStorage.getItem('cart_items');
+      const items = cartJson ? JSON.parse(cartJson) : [];
+      console.log('Items loaded from localStorage:', items);
+      return items;
+    } catch (error) {
+      console.error('Error getting cart items from localStorage:', error);
+      return [];
     }
   };
 
-  const updateQuantity = async (productId: string, quantity: number) => {
-    // Always update local cart first
-    dispatch(updateItemQuantity({ productId, quantity }));
-    
-    // Check authentication directly
-    const isUserAuthenticated = authService.isAuthenticated();
-    
-    // If authenticated, also update backend
-    if (isUserAuthenticated) {
-      try {
-        dispatch(setLoading(true));
-        
-        const cartItem = items.find(item => item.productId.toString() === productId.toString());
-        
-        if (!cartItem?.id) {
-          throw new Error('Cart item not found');
-        }
-
-        console.log('Updating quantity on backend:', {
-          cartItemId: cartItem.id,
-          productId,
-          newQuantity: quantity
-        });
-
-        const response = await api.put(`/api/carts/current/items/${cartItem.id}`, { quantity });
-        
-        if (response.data?.items) {
-          dispatch(setCartItems(response.data.items));
-        }
-      } catch (apiError) {
-        console.error('Failed to sync quantity update with backend:', apiError);
-        dispatch(setError('Failed to update quantity on server'));
-      } finally {
-        dispatch(setLoading(false));
-      }
+  // Function to save cart items to local storage
+  const saveCartItemsToStorage = (items: CartItem[]): void => {
+    try {
+      localStorage.setItem('cart_items', JSON.stringify(items));
+      console.log('Items saved to localStorage:', items);
+    } catch (error) {
+      console.error('Error saving cart items to localStorage:', error);
     }
   };
 
-  const removeFromCart = async (productId: string) => {
-    // Always remove from local cart first
-    dispatch(removeItem(productId));
-    
-    // Check authentication directly
-    const isUserAuthenticated = authService.isAuthenticated();
-    
-    // If authenticated, also remove from backend
-    if (isUserAuthenticated) {
-      try {
-        dispatch(setLoading(true));
-        
-        const cartItem = items.find(item => item.productId.toString() === productId.toString());
-        
-        if (!cartItem?.id) {
-          throw new Error('Cart item not found');
-        }
+  const fetchCartItems = () => {
+    // NO API calls - just load from localStorage
+    console.log('Refreshing cart from localStorage');
+    const savedItems = getCartItemsFromStorage();
+    dispatch(setCartItems(savedItems));
+  };
 
-        console.log('Removing item from backend:', {
-          cartItemId: cartItem.id,
-          productId
-        });
-
-        const response = await api.delete(`/api/carts/current/items/${cartItem.id}`);
-        
-        if (response.data?.items) {
-          dispatch(setCartItems(response.data.items));
-        }
-      } catch (apiError) {
-        console.error('Failed to sync item removal with backend:', apiError);
-        dispatch(setError('Failed to remove item on server'));
-      } finally {
-        dispatch(setLoading(false));
+  const addToCart = (item: CartItem) => {
+    try {
+      console.log('Adding item to cart (localStorage only):', item);
+      
+      // Get current items from localStorage
+      const currentItems = getCartItemsFromStorage();
+      
+      // Check if item already exists
+      const existingItemIndex = currentItems.findIndex(
+        (cartItem) => cartItem.productId === item.productId
+      );
+      
+      let updatedItems;
+      if (existingItemIndex >= 0) {
+        // Update quantity if item exists
+        updatedItems = [...currentItems];
+        updatedItems[existingItemIndex].quantity += item.quantity;
+      } else {
+        // Add new item if it doesn't exist
+        updatedItems = [...currentItems, item];
       }
+      
+      // Save to localStorage
+      saveCartItemsToStorage(updatedItems);
+      
+      // Update Redux store
+      dispatch(setCartItems(updatedItems));
+      
+    } catch (err: any) {
+      console.error('Failed to add item to cart:', err);
+      setError('Failed to add item to cart');
     }
   };
 
-  const emptyCart = async () => {
-    // Always clear local cart first
-    dispatch(clearCart());
-    
-    // Check authentication directly
-    const isUserAuthenticated = authService.isAuthenticated();
-    
-    // If authenticated, also clear backend cart
-    if (isUserAuthenticated) {
-      try {
-        dispatch(setLoading(true));
-        
-        console.log('Clearing cart on backend');
-        await api.delete('/api/carts/current');
-      } catch (apiError) {
-        console.error('Failed to sync cart clearing with backend:', apiError);
-        dispatch(setError('Failed to clear cart on server'));
-      } finally {
-        dispatch(setLoading(false));
-      }
+  const updateQuantity = (productId: string, quantity: number) => {
+    try {
+      console.log(`Updating quantity for product ${productId} to ${quantity}`);
+      
+      // Get current items from localStorage
+      const currentItems = getCartItemsFromStorage();
+      
+      // Update the specific item
+      const updatedItems = currentItems.map((item) => {
+        if (item.productId === productId) {
+          return { ...item, quantity };
+        }
+        return item;
+      });
+      
+      // Save to localStorage
+      saveCartItemsToStorage(updatedItems);
+      
+      // Update Redux store
+      dispatch(setCartItems(updatedItems));
+      
+    } catch (err: any) {
+      console.error('Failed to update item quantity:', err);
+      setError('Failed to update item quantity');
     }
+  };
+
+  const removeFromCart = (productId: string) => {
+    try {
+      console.log(`Removing product ${productId} from cart`);
+      
+      // Get current items from localStorage
+      const currentItems = getCartItemsFromStorage();
+      
+      // Remove the item
+      const updatedItems = currentItems.filter((item) => item.productId !== productId);
+      
+      // Save to localStorage
+      saveCartItemsToStorage(updatedItems);
+      
+      // Update Redux store
+      dispatch(setCartItems(updatedItems));
+      
+    } catch (err: any) {
+      console.error('Failed to remove item from cart:', err);
+      setError('Failed to remove item from cart');
+    }
+  };
+
+  const emptyCart = () => {
+    try {
+      console.log('Clearing cart');
+      
+      // Clear localStorage
+      localStorage.removeItem('cart_items');
+      
+      // Clear Redux store
+      dispatch(clearCart());
+      
+    } catch (err: any) {
+      console.error('Failed to clear cart:', err);
+      setError('Failed to clear cart');
+    }
+  };
+
+  // Function to clear the error state
+  const clearErrorState = () => {
+    setError(null);
   };
 
   const getCartTotal = () => {
+    if (!items || !Array.isArray(items)) return 0;
     return items.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  // Get the total number of items in the cart
   const getItemCount = () => {
+    if (!items || !Array.isArray(items)) return 0;
     return items.reduce((count, item) => count + item.quantity, 0);
   };
 
   return {
-    items,
-    loading: cartLoading,
-    error: cartError,
+    items: items || [], // Ensure items is always an array
+    loading: false, // Never loading since we're not making API calls
+    error: null, // No API errors
     addToCart,
     updateQuantity,
     removeFromCart,
@@ -217,7 +178,7 @@ const useCart = () => {
     getCartTotal,
     getItemCount,
     refreshCart: fetchCartItems,
-    clearError: () => dispatch(setError(null))
+    clearError: clearErrorState
   };
 };
 

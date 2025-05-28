@@ -1,20 +1,13 @@
 // src/pages/cart/CartPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, User } from 'lucide-react';
 import CartItemRow from '../../components/cart/CartItemRow';
 import Button from '../../components/common/Button';
 import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
-import * as authService from '../../services/auth';
 
 const CartPage: React.FC = () => {
-  // State hooks first
-  const [localState, setLocalState] = useState({});
-  
-  // Then other hooks
-  const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
   const { 
     items, 
     loading, 
@@ -26,30 +19,19 @@ const CartPage: React.FC = () => {
     removeFromCart 
   } = useCart();
   
-  // Add a direct check from localStorage
-  const [directAuthCheck, setDirectAuthCheck] = useState(false);
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   
-  // Check authentication directly from localStorage as a fallback
+  // Refresh cart data when the component mounts or authentication state changes
   useEffect(() => {
-    const isUserAuthenticated = authService.isAuthenticated();
-    setDirectAuthCheck(isUserAuthenticated);
-  }, []);
-  
-  // Effects after all hooks
-  useEffect(() => {
-    // Use either Redux state or direct localStorage check
-    if (isAuthenticated || directAuthCheck) {
+    if (isAuthenticated) {
       refreshCart();
     }
-  }, [isAuthenticated, directAuthCheck, refreshCart]);
-  
-  // Use either Redux state or direct localStorage check for authentication
-  const effectiveIsAuthenticated = isAuthenticated || directAuthCheck;
-  const effectiveUser = user || authService.getCurrentUser();
+  }, [isAuthenticated]);
   
   const handleCheckout = () => {
-    // Check both Redux state and localStorage
-    if (!effectiveIsAuthenticated) {
+    if (!isAuthenticated) {
+      // Redirect to login if not authenticated
       navigate('/login', { state: { from: { pathname: '/checkout' } } });
     } else {
       navigate('/checkout');
@@ -78,12 +60,14 @@ const CartPage: React.FC = () => {
     );
   }
   
-  if (items.length === 0) {
+  // Add null check to prevent the error
+  if (!items || items.length === 0) {
     return (
       <div className="pb-16">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
         
-        {effectiveIsAuthenticated && effectiveUser && (
+        {/* User information section - only for authenticated users */}
+        {isAuthenticated && user && (
           <div className="mb-6 bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center space-x-3">
               <div className="bg-blue-100 p-3 rounded-full">
@@ -91,15 +75,16 @@ const CartPage: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-lg font-medium text-gray-900">
-                  Hello, {effectiveUser.firstName} {effectiveUser.lastName}
+                  Hello, {user.firstName} {user.lastName}
                 </h2>
-                <p className="text-sm text-gray-500">{effectiveUser.email}</p>
+                <p className="text-sm text-gray-500">{user.email}</p>
               </div>
             </div>
           </div>
         )}
         
-        {effectiveIsAuthenticated ? (
+        {/* Connection status indicator */}
+        {isAuthenticated ? (
           <div className="mb-4 text-sm text-green-600 bg-green-50 rounded-md px-3 py-2 inline-block">
             ✓ Connected to your account
           </div>
@@ -125,7 +110,8 @@ const CartPage: React.FC = () => {
     <div className="pb-16">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
       
-      {effectiveIsAuthenticated && effectiveUser && (
+      {/* User information section - only for authenticated users */}
+      {isAuthenticated && user && (
         <div className="mb-6 bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center space-x-3">
             <div className="bg-blue-100 p-3 rounded-full">
@@ -133,15 +119,16 @@ const CartPage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-lg font-medium text-gray-900">
-                Hello, {effectiveUser.firstName} {effectiveUser.lastName}
+                Hello, {user.firstName} {user.lastName}
               </h2>
-              <p className="text-sm text-gray-500">{effectiveUser.email}</p>
+              <p className="text-sm text-gray-500">{user.email}</p>
             </div>
           </div>
         </div>
       )}
       
-      {effectiveIsAuthenticated ? (
+      {/* Connection status indicator */}
+      {isAuthenticated ? (
         <div className="mb-4 text-sm text-green-600 bg-green-50 rounded-md px-3 py-2 inline-block">
           ✓ Connected to your account
         </div>
@@ -163,6 +150,7 @@ const CartPage: React.FC = () => {
                 {items.map((item) => (
                   <li key={item.id || `${item.productId}-${item.name}`} className="py-4">
                     <div className="flex items-center space-x-4">
+                      {/* Product image */}
                       <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-gray-100">
                         {item.imageUrl ? (
                           <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
@@ -173,11 +161,13 @@ const CartPage: React.FC = () => {
                         )}
                       </div>
                       
+                      {/* Product details */}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-base font-medium text-gray-900 truncate">{item.name}</h3>
                         <p className="text-sm text-gray-500">Price: ${item.price.toFixed(2)}</p>
                       </div>
                       
+                      {/* Quantity controls */}
                       <div className="flex items-center space-x-2">
                         <button 
                           onClick={() => updateQuantity(item.productId.toString(), Math.max(1, item.quantity - 1))}
@@ -199,6 +189,7 @@ const CartPage: React.FC = () => {
                         </button>
                       </div>
                       
+                      {/* Total and remove */}
                       <div className="text-right">
                         <p className="text-base font-medium text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
                         <button 

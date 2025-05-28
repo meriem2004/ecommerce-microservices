@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, User, Search } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
-import useCart from '../../hooks/useCart';
+import { getItemCount } from '../../utils/cart';
 import { STORAGE_KEYS } from '../../config';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { isAuthenticated, user, logout } = useAuth();
-  const { getItemCount } = useCart();
   const navigate = useNavigate();
   
   // Direct authentication check from localStorage
