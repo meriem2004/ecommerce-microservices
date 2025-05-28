@@ -8,24 +8,32 @@ const DEBUG = true;
 
 // Set auth token in headers and localStorage
 export const setAuthToken = (token: string | null) => {
-  if (token) {
-    const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-    api.defaults.headers.common['Authorization'] = formattedToken;
-    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-    DEBUG && console.log('Auth token set');
-  } else {
-    delete api.defaults.headers.common['Authorization'];
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    DEBUG && console.log('Auth token removed');
+  try {
+    if (token) {
+      const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      api.defaults.headers.common['Authorization'] = formattedToken;
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      DEBUG && console.log('Auth token set');
+    } else {
+      delete api.defaults.headers.common['Authorization'];
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      DEBUG && console.log('Auth token removed');
+    }
+  } catch (e) {
+    console.error('Failed to set auth token in localStorage:', e);
   }
 };
 
 // Set user data in localStorage
 export const setUserData = (user: User | null) => {
-  if (user) {
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.USER);
+  try {
+    if (user) {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.USER);
+    }
+  } catch (e) {
+    console.error('Failed to set user data in localStorage:', e);
   }
 };
 
@@ -38,17 +46,6 @@ export const getCurrentUser = (): User | null => {
 // Check authentication status
 export const isAuthenticated = (): boolean => {
   return !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) && !!getCurrentUser();
-};
-
-// Verify token with backend
-export const verifyToken = async (): Promise<boolean> => {
-  try {
-    const response = await api.get('/api/auth/verify');
-    return response.status === 200;
-  } catch (error) {
-    console.error('Token verification failed:', error);
-    return false;
-  }
 };
 
 // Register new user
@@ -74,7 +71,7 @@ export const register = async (userData: RegisterRequest): Promise<AuthResponse>
 export const login = async (credentials: LoginRequest): Promise<AuthResponse> => {
   try {
     const response = await api.post<AuthResponse>('/api/auth/login', {
-      email: credentials.username,
+      email: credentials.email,
       password: credentials.password
     });
     
@@ -90,28 +87,6 @@ export const login = async (credentials: LoginRequest): Promise<AuthResponse> =>
   } catch (error: any) {
     console.error('Login failed:', error);
     throw error;
-  }
-};
-
-// Refresh token
-export const refreshToken = async (): Promise<string | null> => {
-  const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-  if (!refreshToken) return null;
-
-  try {
-    const response = await api.post('/api/auth/refresh', { refreshToken });
-    const newToken = response.data.token;
-    setAuthToken(newToken);
-    
-    if (response.data.refreshToken) {
-      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
-    }
-    
-    return newToken;
-  } catch (error) {
-    console.error('Token refresh failed:', error);
-    logout();
-    return null;
   }
 };
 

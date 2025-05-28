@@ -16,6 +16,7 @@ export const ROUTES = {
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
-  USER: 'user',
-  CART: 'cart_items',
+  REFRESH_TOKEN: 'refresh_token',
+  USER: 'user_data',
+  CART: 'cart_data',
 };

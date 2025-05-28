@@ -7,14 +7,17 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import FormInput from '../../components/common/FormInput';
 import Button from '../../components/common/Button';
 import useAuth from '../../hooks/useAuth';
+import { useDispatch } from 'react-redux';
+import { updateAuthState } from '../../store/authSlice';
+import { setAuthToken, setUserData } from '../../services/auth';
 
 interface LoginFormData {
-  username: string;
+  email: string;
   password: string;
 }
 
 const schema = yup.object({
-  username: yup.string().email('Please enter a valid email').required('Email is required'),
+  email: yup.string().email('Please enter a valid email').required('Email is required'),
   password: yup.string().required('Password is required'),
 }).required();
 
@@ -23,6 +26,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [localError, setLocalError] = useState<string | null>(null);
+  const dispatch = useDispatch();
   
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: yupResolver(schema),
@@ -31,20 +35,20 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       setLocalError(null);
-      
-      // Use the auth hook - it handles everything properly
-      await login({
-        username: data.username, // This will be mapped to email in the auth service
+      const result = await login({
+        email: data.email,
         password: data.password
       });
-      
-      // Get redirect path or default to home
+      // Save tokens and user data before navigation
+      setAuthToken(result.token);
+      setUserData(result.user);
+      dispatch(updateAuthState());
       const from = (location.state as any)?.from?.pathname || '/';
       navigate(from);
-      
     } catch (err: any) {
       console.error('Login error:', err);
-      setLocalError(err.message || 'Login failed. Please check your credentials.');
+      setLocalError(err.message || 'Login failed');
+      alert('Login failed: ' + (err.message || 'Unknown error'));
     }
   };
   
@@ -66,8 +70,8 @@ const LoginPage: React.FC = () => {
             label="Email address"
             type="email"
             autoComplete="email"
-            {...register('username')} 
-            error={errors.username?.message}
+            {...register('email')}
+            error={errors.email?.message}
           />
           
           <FormInput

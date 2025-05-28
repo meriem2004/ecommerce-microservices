@@ -1,8 +1,10 @@
 // src/App.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store';
+import { useDispatch } from 'react-redux';
+import { syncAuthFromStorage } from './store/authSlice';
 
 // Layouts
 import MainLayout from './components/layout/MainLayout';
@@ -18,38 +20,45 @@ import CartPage from './pages/cart/CartPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
-function App() {
-  return (
-    <Provider store={store}>
-      <BrowserRouter>
-        <Routes>
-          {/* Auth Routes */}
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+const AuthSyncer = () => {
+  const dispatch = useDispatch();
+  useEffect(() => {
+    dispatch(syncAuthFromStorage());
+  }, [dispatch]);
+  return null;
+};
+
+const App = () => (
+  <Provider store={store}>
+    <BrowserRouter>
+      <AuthSyncer />
+      <Routes>
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+
+        {/* Main Layout Routes */}
+        <Route element={<MainLayout />}>
+          {/* Public Routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/products" element={<ProductListingPage />} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+
+          {/* Protected Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/orders" element={<ProductListingPage />} />
           </Route>
 
-          {/* Main Layout Routes */}
-          <Route element={<MainLayout />}>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/products" element={<ProductListingPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
-
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/orders" element={<ProductListingPage />} />
-            </Route>
-
-            {/* Fallback route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </Provider>
-  );
-}
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  </Provider>
+);
 
 export default App;

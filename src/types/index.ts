@@ -14,7 +14,7 @@ export interface User {
 }
 
 export interface LoginRequest {
-  username: string; // Will be mapped to email in the auth service
+  email: string;
   password: string;
 }
 

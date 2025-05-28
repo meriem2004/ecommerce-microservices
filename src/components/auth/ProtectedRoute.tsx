@@ -1,27 +1,39 @@
 // src/components/auth/ProtectedRoute.tsx
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import useAuth from '../../hooks/useAuth';
+import { STORAGE_KEYS } from '../../config';
 
 const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated, verifyAuth, loading } = useAuth();
-  const [isVerified, setIsVerified] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const location = useLocation();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (isAuthenticated) {
-        setIsVerified(true);
-      } else {
-        const verified = await verifyAuth();
-        setIsVerified(verified);
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const userData = localStorage.getItem(STORAGE_KEYS.USER);
+        
+        const authenticated = !!(token && userData);
+        
+        console.log('ProtectedRoute auth check:', {
+          hasToken: !!token,
+          hasUser: !!userData,
+          authenticated,
+          location: location.pathname
+        });
+        
+        setIsAuthenticated(authenticated);
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuthenticated(false);
       }
     };
 
     checkAuth();
-  }, [location.pathname, isAuthenticated, verifyAuth]);
+  }, [location.pathname]);
 
-  if (loading) {
+  // Show loading while checking authentication
+  if (isAuthenticated === null) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -29,11 +41,13 @@ const ProtectedRoute: React.FC = () => {
     );
   }
 
-  return isVerified ? (
-    <Outlet />
-  ) : (
-    <Navigate to="/login" state={{ from: location }} replace />
-  );
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Render protected content
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

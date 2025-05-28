@@ -22,17 +22,6 @@ const useCart = () => {
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   // Then other hooks
-  const verifyToken = useCallback(async () => {
-    try {
-      const response = await api.get('/api/carts/debug-auth');
-      console.log('Token verification response:', response.data);
-      return response.data.status === 'Authenticated';
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      return false;
-    }
-  }, []);
-
   const fetchCartItems = useCallback(async () => {
     // Check localStorage directly since redux state might not be updated yet
     const isUserAuthenticated = authService.isAuthenticated();
