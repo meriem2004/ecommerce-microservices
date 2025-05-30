@@ -34,7 +34,10 @@ const CartPage: React.FC = () => {
       // Redirect to login if not authenticated
       navigate('/login', { state: { from: { pathname: '/checkout' } } });
     } else {
-      navigate('/checkout');
+      // Log cart data for debugging
+      console.log('Proceeding to checkout with cart:', items, 'Total:', getCartTotal());
+      // Pass cart data to checkout page
+      navigate('/checkout', { state: { cart: items, total: getCartTotal() } });
     }
   };
   

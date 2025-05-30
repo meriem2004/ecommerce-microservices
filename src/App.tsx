@@ -20,6 +20,8 @@ import CartPage from './pages/cart/CartPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminDashboard from './pages/admin';
+import CheckoutPage from './pages/cart/CheckoutPage';
+import PaymentPage from './pages/cart/PaymentPage';
 
 const AuthSyncer = () => {
   const dispatch = useDispatch();
@@ -52,6 +54,8 @@ const App = () => (
             <Route path="/cart" element={<CartPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/orders" element={<ProductListingPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/payment" element={<PaymentPage />} />
           </Route>
 
           {/* Admin Routes */}
