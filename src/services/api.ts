@@ -11,7 +11,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Allow sending cookies in cross-origin requests
+  withCredentials: false, // CORS fix
   timeout: 10000 // 10 second timeout
 });
 
@@ -52,13 +52,6 @@ api.interceptors.request.use(
       }
     }
     
-    // Log final headers (sanitized)
-    const sanitizedHeaders = { ...config.headers };
-    if (sanitizedHeaders.Authorization) {
-      sanitizedHeaders.Authorization = 'Bearer ***';
-    }
-    console.log('Final request headers:', sanitizedHeaders);
-    
     return config;
   },
   (error) => {
@@ -70,46 +63,25 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => {
-    console.log(`API Response from ${response.config.url}:`, {
+    console.log(`✅ API Response from ${response.config.url}:`, {
       status: response.status,
-      statusText: response.statusText,
-      headers: response.headers
+      statusText: response.statusText
     });
     return response;
   },
   (error: AxiosError) => {
-    console.error('API Error Details:', {
+    console.error('❌ API Error Details:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
-      headers: error.response?.headers,
       message: error.message
     });
     
-    // Handle specific error cases
-    if (error.response?.status === 401) {
-      console.log('401 Unauthorized - clearing auth data');
-      
-      // Clear local storage
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.USER);
-      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-      
-      // Only redirect if not already on login page
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/register') {
-        console.log('Redirecting to login page');
-        window.location.href = '/login';
-      }
-    }
-    
-    // Handle CORS errors
-    if (error.message === 'Network Error' && !error.response) {
-      console.error('Network error - possibly CORS related');
-      error.message = 'Network error: Unable to connect to server. Check CORS configuration.';
-    }
+    // ✅ REMOVED AUTO-REDIRECT LOGIC
+    // Just log the error and let the component handle it
+    console.log('Error occurred but NOT redirecting automatically');
     
     return Promise.reject(error);
   }
