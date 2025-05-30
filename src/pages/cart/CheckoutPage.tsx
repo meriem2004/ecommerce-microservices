@@ -13,16 +13,8 @@ const CheckoutPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Check if user is logged in
+  // For demonstration, log the cart and total
   React.useEffect(() => {
-    const user = localStorage.getItem(STORAGE_KEYS.USER);
-    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    
-    if (!user || !token) {
-      setError('Please log in to place an order');
-      return;
-    }
-
     console.log('Checkout page cart:', cart);
     console.log('Checkout page total:', total);
     
@@ -60,25 +52,30 @@ const CheckoutPage: React.FC = () => {
     setLoading(true);
     
     try {
-      console.log('Submitting order with cart:', cart);
+      console.log('Creating order with cart:', cart);
       
       const response = await submitOrder({
         cart,
         total,
-        shippingAddress,
+        shippingAddress: shippingAddress.trim(),
       });
       
-      console.log('Order submitted successfully:', response.data);
+      console.log('Order created successfully:', response.data);
       
-      // Clear cart from localStorage if you're storing it there
-      // localStorage.removeItem(STORAGE_KEYS.CART);
-      
-      // Navigate to payment page with order info
-      navigate('/payment', { state: { total, shippingAddress } });
+      // Navigate to payment page with order details
+      navigate('/payment', { 
+        state: { 
+          total,
+          shippingAddress: shippingAddress.trim(),
+          orderId: response.data.id,
+          orderNumber: response.data.orderNumber,
+          orderData: response.data
+        } 
+      });
       
     } catch (error: any) {
-      console.error('Order submission error:', error);
-      setError(error.message || 'Failed to submit order. Please try again.');
+      console.error('Order creation error:', error);
+      setError(error.message || 'Failed to create order. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -124,7 +121,7 @@ const CheckoutPage: React.FC = () => {
         disabled={loading || !shippingAddress.trim() || cart.length === 0} 
         fullWidth
       >
-        {loading ? 'Processing Order...' : 'Place Order'}
+        {loading ? 'Creating Order...' : 'Continue to Payment'}
       </Button>
 
       <Button 
