@@ -5,23 +5,28 @@ import { RootState } from '../store';
 import { addItem, updateItemQuantity, removeItem, clearCart, setCartItems } from '../store/cartSlice';
 import { CartItem } from '../types';
 import { STORAGE_KEYS } from '../config';
+import api from '../services/api';
 
 const useCart = () => {
   const dispatch = useDispatch();
   const { items } = useSelector((state: RootState) => state.cart);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
-  // NO backend calls at all - just use localStorage
+  // Load cart on mount - prioritize backend if authenticated
   useEffect(() => {
-    // Load from localStorage only
-    console.log('Loading cart from localStorage only');
-    const savedItems = getCartItemsFromStorage();
-    if (savedItems.length > 0) {
-      dispatch(setCartItems(savedItems));
+    if (isAuthenticated && user) {
+      console.log('User is authenticated, fetching cart from backend');
+      fetchCartFromBackend();
+    } else {
+      console.log('User not authenticated, loading cart from localStorage');
+      const savedItems = getCartItemsFromStorage();
+      if (savedItems.length > 0) {
+        dispatch(setCartItems(savedItems));
+      }
     }
-  }, [dispatch]);
+  }, [dispatch, isAuthenticated, user]);
 
   // Function to get cart items from local storage
   const getCartItemsFromStorage = (): CartItem[] => {
@@ -54,7 +59,6 @@ const useCart = () => {
   const saveCartAndItemsToStorage = (items: CartItem[]): void => {
     try {
       localStorage.setItem('cart_items', JSON.stringify(items));
-      // Build cart object matching Cart.java
       const userId = getUserIdFromStorage();
       const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const now = new Date().toISOString();
@@ -72,75 +76,228 @@ const useCart = () => {
     }
   };
 
-  const fetchCartItems = () => {
-    // NO API calls - just load from localStorage
-    console.log('Refreshing cart from localStorage');
-    const savedItems = getCartItemsFromStorage();
-    dispatch(setCartItems(savedItems));
+  // Fetch cart from backend
+  const fetchCartFromBackend = async () => {
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping backend fetch');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('Fetching cart from backend...');
+      const response = await api.get('/api/carts/current');
+      console.log('Backend cart response:', response.data);
+      
+      const backendItems = response.data.items || [];
+      
+      // Convert backend format to frontend format
+      const convertedItems: CartItem[] = backendItems.map((item: any) => ({
+        id: item.id,
+        productId: item.productId.toString(),
+        name: item.productName,
+        price: parseFloat(item.price),
+        quantity: item.quantity,
+        imageUrl: item.imageUrl || undefined
+      }));
+      
+      console.log('Converted backend items:', convertedItems);
+      dispatch(setCartItems(convertedItems));
+      saveCartAndItemsToStorage(convertedItems);
+      
+    } catch (err: any) {
+      console.error('Failed to fetch cart from backend:', err);
+      setError('Failed to load cart from server');
+      
+      // Fallback to localStorage
+      const savedItems = getCartItemsFromStorage();
+      if (savedItems.length > 0) {
+        dispatch(setCartItems(savedItems));
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addToCart = (item: CartItem) => {
+  const fetchCartItems = () => {
+    if (isAuthenticated && user) {
+      fetchCartFromBackend();
+    } else {
+      console.log('Refreshing cart from localStorage');
+      const savedItems = getCartItemsFromStorage();
+      dispatch(setCartItems(savedItems));
+    }
+  };
+
+  const addToCart = async (item: CartItem) => {
     try {
-      console.log('Adding item to cart (localStorage only):', item);
-      const currentItems = getCartItemsFromStorage();
-      const existingItemIndex = currentItems.findIndex(
-        (cartItem) => cartItem.productId === item.productId
-      );
-      let updatedItems;
-      if (existingItemIndex >= 0) {
-        updatedItems = [...currentItems];
-        updatedItems[existingItemIndex].quantity += item.quantity;
+      console.log('Adding item to cart:', item);
+      setLoading(true);
+      setError(null);
+
+      if (isAuthenticated && user) {
+        // Add to backend
+        const response = await api.post('/api/carts/current/items', {
+          productId: parseInt(item.productId),
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        });
+        
+        console.log('Backend add response:', response.data);
+        
+        // Update Redux store with backend response
+        const backendItems = response.data.items || [];
+        const convertedItems: CartItem[] = backendItems.map((backendItem: any) => ({
+          id: backendItem.id,
+          productId: backendItem.productId.toString(),
+          name: backendItem.productName,
+          price: parseFloat(backendItem.price),
+          quantity: backendItem.quantity,
+          imageUrl: backendItem.imageUrl || undefined
+        }));
+        
+        dispatch(setCartItems(convertedItems));
+        saveCartAndItemsToStorage(convertedItems);
       } else {
-        updatedItems = [...currentItems, item];
+        // Add to localStorage only
+        const currentItems = getCartItemsFromStorage();
+        const existingItemIndex = currentItems.findIndex(
+          (cartItem) => cartItem.productId === item.productId
+        );
+        let updatedItems;
+        if (existingItemIndex >= 0) {
+          updatedItems = [...currentItems];
+          updatedItems[existingItemIndex].quantity += item.quantity;
+        } else {
+          updatedItems = [...currentItems, item];
+        }
+        saveCartAndItemsToStorage(updatedItems);
+        dispatch(setCartItems(updatedItems));
       }
-      saveCartAndItemsToStorage(updatedItems);
-      dispatch(setCartItems(updatedItems));
     } catch (err: any) {
       console.error('Failed to add item to cart:', err);
       setError('Failed to add item to cart');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = async (productId: string, quantity: number) => {
     try {
       console.log(`Updating quantity for product ${productId} to ${quantity}`);
-      const currentItems = getCartItemsFromStorage();
-      const updatedItems = currentItems.map((item) => {
-        if (item.productId === productId) {
-          return { ...item, quantity };
-        }
-        return item;
-      });
-      saveCartAndItemsToStorage(updatedItems);
-      dispatch(setCartItems(updatedItems));
+      setLoading(true);
+      setError(null);
+
+      if (isAuthenticated && user) {
+        // Update on backend
+        const response = await api.put(`/api/carts/current/items/${productId}`, {
+          quantity: quantity
+        });
+        
+        console.log('Backend update response:', response.data);
+        
+        // Update Redux store with backend response
+        const backendItems = response.data.items || [];
+        const convertedItems: CartItem[] = backendItems.map((backendItem: any) => ({
+          id: backendItem.id,
+          productId: backendItem.productId.toString(),
+          name: backendItem.productName,
+          price: parseFloat(backendItem.price),
+          quantity: backendItem.quantity,
+          imageUrl: backendItem.imageUrl || undefined
+        }));
+        
+        dispatch(setCartItems(convertedItems));
+        saveCartAndItemsToStorage(convertedItems);
+      } else {
+        // Update localStorage only
+        const currentItems = getCartItemsFromStorage();
+        const updatedItems = currentItems.map((item) => {
+          if (item.productId === productId) {
+            return { ...item, quantity };
+          }
+          return item;
+        });
+        saveCartAndItemsToStorage(updatedItems);
+        dispatch(setCartItems(updatedItems));
+      }
     } catch (err: any) {
       console.error('Failed to update item quantity:', err);
       setError('Failed to update item quantity');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = async (productId: string) => {
     try {
       console.log(`Removing product ${productId} from cart`);
-      const currentItems = getCartItemsFromStorage();
-      const updatedItems = currentItems.filter((item) => item.productId !== productId);
-      saveCartAndItemsToStorage(updatedItems);
-      dispatch(setCartItems(updatedItems));
+      setLoading(true);
+      setError(null);
+
+      if (isAuthenticated && user) {
+        // Remove from backend
+        const response = await api.delete(`/api/carts/current/items/${productId}`);
+        
+        console.log('Backend remove response:', response.data);
+        
+        // Update Redux store with backend response
+        const backendItems = response.data.items || [];
+        const convertedItems: CartItem[] = backendItems.map((backendItem: any) => ({
+          id: backendItem.id,
+          productId: backendItem.productId.toString(),
+          name: backendItem.productName,
+          price: parseFloat(backendItem.price),
+          quantity: backendItem.quantity,
+          imageUrl: backendItem.imageUrl || undefined
+        }));
+        
+        dispatch(setCartItems(convertedItems));
+        saveCartAndItemsToStorage(convertedItems);
+      } else {
+        // Remove from localStorage only
+        const currentItems = getCartItemsFromStorage();
+        const updatedItems = currentItems.filter((item) => item.productId !== productId);
+        saveCartAndItemsToStorage(updatedItems);
+        dispatch(setCartItems(updatedItems));
+      }
     } catch (err: any) {
       console.error('Failed to remove item from cart:', err);
       setError('Failed to remove item from cart');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const emptyCart = () => {
+  const emptyCart = async () => {
     try {
       console.log('Clearing cart');
-      localStorage.removeItem('cart_items');
-      localStorage.removeItem('cart');
-      dispatch(clearCart());
+      setLoading(true);
+      setError(null);
+
+      if (isAuthenticated && user) {
+        // Clear on backend
+        const response = await api.delete('/api/carts/current');
+        console.log('Backend clear response:', response.data);
+        
+        // Clear Redux store
+        dispatch(clearCart());
+        localStorage.removeItem('cart_items');
+        localStorage.removeItem('cart');
+      } else {
+        // Clear localStorage only
+        localStorage.removeItem('cart_items');
+        localStorage.removeItem('cart');
+        dispatch(clearCart());
+      }
     } catch (err: any) {
       console.error('Failed to clear cart:', err);
       setError('Failed to clear cart');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -161,9 +318,9 @@ const useCart = () => {
   };
 
   return {
-    items: items || [], // Ensure items is always an array
-    loading: false, // Never loading since we're not making API calls
-    error: null, // No API errors
+    items: items || [],
+    loading,
+    error,
     addToCart,
     updateQuantity,
     removeFromCart,
