@@ -11,7 +11,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Allow sending cookies in cross-origin requests
+  withCredentials: true, // Allow sending cookies in cross-origin requests
+  timeout: 10000 // 10 second timeout
 });
 
 // Request interceptor for adding auth token
@@ -19,40 +20,51 @@ api.interceptors.request.use(
   (config) => {
     // Always add the token if it exists (for all requests)
     const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const user = localStorage.getItem(STORAGE_KEYS.USER);
+    
+    console.log('API Request Interceptor:', {
+      url: config.url,
+      method: config.method,
+      hasToken: !!token,
+      hasUser: !!user,
+      tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+    });
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       
-      // Add user information for cart service requests
-      if (config.url && config.url.includes('/api/carts')) {
-        const userJson = localStorage.getItem(STORAGE_KEYS.USER);
-        if (userJson) {
-          try {
-            const user = JSON.parse(userJson);
-            if (user.email) {
-              config.headers['X-User-Email'] = user.email;
-            }
-            if (user.id) {
-              config.headers['X-User-Id'] = user.id.toString();
-            }
-          } catch (err) {
-            console.error('Error parsing user data:', err);
+      // Add user information for all requests
+      if (user) {
+        try {
+          const userData = JSON.parse(user);
+          if (userData.email) {
+            config.headers['X-User-Email'] = userData.email;
           }
+          if (userData.id) {
+            config.headers['X-User-Id'] = userData.id.toString();
+          }
+          if (userData.roles) {
+            config.headers['X-User-Roles'] = Array.isArray(userData.roles) ? userData.roles.join(',') : userData.roles;
+          }
+        } catch (err) {
+          console.error('Error parsing user data:', err);
         }
       }
-      
-      // Log request info for debugging
-      console.log('Request config:', {
-        url: config.url,
-        method: config.method,
-        headers: config.headers
-      });
-    } else {
-      console.log('No auth token available for request');
     }
+    
+    // Log final headers (sanitized)
+    const sanitizedHeaders = { ...config.headers };
+    if (sanitizedHeaders.Authorization) {
+      sanitizedHeaders.Authorization = 'Bearer ***';
+    }
+    console.log('Final request headers:', sanitizedHeaders);
     
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor for handling errors
@@ -60,32 +72,43 @@ api.interceptors.response.use(
   (response) => {
     console.log(`API Response from ${response.config.url}:`, {
       status: response.status,
-      statusText: response.statusText
+      statusText: response.statusText,
+      headers: response.headers
     });
     return response;
   },
   (error: AxiosError) => {
-    console.error('API Error:', {
+    console.error('API Error Details:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
       statusText: error.response?.statusText,
-      data: error.response?.data
+      data: error.response?.data,
+      headers: error.response?.headers,
+      message: error.message
     });
     
-    // Handle 401 Unauthorized errors (expired token, etc.)
+    // Handle specific error cases
     if (error.response?.status === 401) {
-      console.log('401 Unauthorized response from API');
+      console.log('401 Unauthorized - clearing auth data');
       
       // Clear local storage
       localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
       localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
       
-      // Redirect to login page if not already there
+      // Only redirect if not already on login page
       const currentPath = window.location.pathname;
-      if (currentPath !== '/login') {
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        console.log('Redirecting to login page');
         window.location.href = '/login';
       }
+    }
+    
+    // Handle CORS errors
+    if (error.message === 'Network Error' && !error.response) {
+      console.error('Network error - possibly CORS related');
+      error.message = 'Network error: Unable to connect to server. Check CORS configuration.';
     }
     
     return Promise.reject(error);

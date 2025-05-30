@@ -36,7 +36,11 @@ const RegisterPage: React.FC = () => {
       const { confirmPassword, ...registerData } = data;
       
       await registerUser(registerData);
-      navigate('/', { replace: true });
+      if (data.email.endsWith('@shophub.com')) {
+        navigate('/admin');
+      } else {
+        navigate('/products');
+      }
     } catch (err: any) {
       setLocalError(err.message || 'Registration failed. Please try again.');
     }

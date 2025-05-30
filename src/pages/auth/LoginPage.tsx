@@ -44,7 +44,11 @@ const LoginPage: React.FC = () => {
       setUserData(result.user);
       dispatch(updateAuthState());
       const from = (location.state as any)?.from?.pathname || '/';
-      navigate(from);
+      if (data.email.endsWith('@shophub.com')) {
+        navigate('/admin');
+      } else {
+        navigate('/products');
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       setLocalError(err.message || 'Login failed');

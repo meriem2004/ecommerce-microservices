@@ -1,6 +1,7 @@
 // src/services/product.ts
 import axios from 'axios';
-import { Product } from '../types';
+import api from './api'; // Import your configured api instance
+import { Product, Category } from '../types';
 import { API_BASE_URL } from '../config';
 
 // Helper function to format error messages
@@ -74,15 +75,6 @@ export const getProductById = async (id: string): Promise<Product> => {
   }
 };
 
-// For admin operations, create a different axios instance with auth headers
-const createAuthHeaders = () => {
-  const token = localStorage.getItem('auth_token');
-  // Make sure to add the Bearer prefix
-  return {
-    'Authorization': token ? `Bearer ${token}` : ''
-  };
-};
-
 /**
  * Create a new product (admin only)
  * @param productData - New product data
@@ -90,16 +82,10 @@ const createAuthHeaders = () => {
  */
 export const createProduct = async (productData: Omit<Product, 'id'>): Promise<Product> => {
   try {
-    // Log the auth header being used
-    console.log('Creating product with auth header:', createAuthHeaders());
+    console.log('Creating product with configured api instance');
     
-    const response = await axios.post<Product>(
-      `${API_BASE_URL}/api/products`,
-      productData,
-      {
-        headers: createAuthHeaders()
-      }
-    );
+    // USE THE CONFIGURED API INSTANCE - this is the fix!
+    const response = await api.post<Product>('/api/products', productData);
     console.log('Product created successfully:', response.data);
     return response.data;
   } catch (error) {
@@ -116,16 +102,10 @@ export const createProduct = async (productData: Omit<Product, 'id'>): Promise<P
  */
 export const updateProduct = async (id: string, productData: Partial<Product>): Promise<Product> => {
   try {
-    // Log the auth header being used
-    console.log('Updating product with auth header:', createAuthHeaders());
+    console.log('Updating product with configured api instance');
     
-    const response = await axios.put<Product>(
-      `${API_BASE_URL}/api/products/${id}`,
-      productData,
-      {
-        headers: createAuthHeaders()
-      }
-    );
+    // USE THE CONFIGURED API INSTANCE - this is the fix!
+    const response = await api.put<Product>(`/api/products/${id}`, productData);
     console.log('Product updated successfully:', response.data);
     return response.data;
   } catch (error) {
@@ -141,18 +121,26 @@ export const updateProduct = async (id: string, productData: Partial<Product>): 
  */
 export const deleteProduct = async (id: string): Promise<void> => {
   try {
-    // Log the auth header being used
-    console.log('Deleting product with auth header:', createAuthHeaders());
+    console.log('Deleting product with configured api instance');
     
-    await axios.delete(
-      `${API_BASE_URL}/api/products/${id}`,
-      {
-        headers: createAuthHeaders()
-      }
-    );
+    // USE THE CONFIGURED API INSTANCE - this is the fix!
+    await api.delete(`/api/products/${id}`);
     console.log('Product deleted successfully');
   } catch (error) {
     console.error(`Error deleting product with id ${id}:`, error);
+    throw new Error(formatErrorMessage(error));
+  }
+};
+
+/**
+ * Get all categories
+ * @returns Promise with array of categories
+ */
+export const getCategories = async (): Promise<Category[]> => {
+  try {
+    const response = await publicApi.get<Category[]>('/api/categories');
+    return response.data;
+  } catch (error) {
     throw new Error(formatErrorMessage(error));
   }
 };

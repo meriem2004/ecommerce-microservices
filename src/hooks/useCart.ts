@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addItem, updateItemQuantity, removeItem, clearCart, setCartItems } from '../store/cartSlice';
 import { CartItem } from '../types';
+import { STORAGE_KEYS } from '../config';
 
 const useCart = () => {
   const dispatch = useDispatch();
@@ -35,13 +36,39 @@ const useCart = () => {
     }
   };
 
-  // Function to save cart items to local storage
-  const saveCartItemsToStorage = (items: CartItem[]): void => {
+  // Function to get userId from localStorage
+  const getUserIdFromStorage = (): number | null => {
+    try {
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.id || null;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Function to save cart and cart_items to localStorage
+  const saveCartAndItemsToStorage = (items: CartItem[]): void => {
     try {
       localStorage.setItem('cart_items', JSON.stringify(items));
-      console.log('Items saved to localStorage:', items);
+      // Build cart object matching Cart.java
+      const userId = getUserIdFromStorage();
+      const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const now = new Date().toISOString();
+      const cart = {
+        userId,
+        items,
+        totalAmount,
+        createdAt: now,
+        updatedAt: now
+      };
+      localStorage.setItem('cart', JSON.stringify(cart));
+      console.log('Cart and items saved to localStorage:', { cart, items });
     } catch (error) {
-      console.error('Error saving cart items to localStorage:', error);
+      console.error('Error saving cart and items to localStorage:', error);
     }
   };
 
@@ -55,31 +82,19 @@ const useCart = () => {
   const addToCart = (item: CartItem) => {
     try {
       console.log('Adding item to cart (localStorage only):', item);
-      
-      // Get current items from localStorage
       const currentItems = getCartItemsFromStorage();
-      
-      // Check if item already exists
       const existingItemIndex = currentItems.findIndex(
         (cartItem) => cartItem.productId === item.productId
       );
-      
       let updatedItems;
       if (existingItemIndex >= 0) {
-        // Update quantity if item exists
         updatedItems = [...currentItems];
         updatedItems[existingItemIndex].quantity += item.quantity;
       } else {
-        // Add new item if it doesn't exist
         updatedItems = [...currentItems, item];
       }
-      
-      // Save to localStorage
-      saveCartItemsToStorage(updatedItems);
-      
-      // Update Redux store
+      saveCartAndItemsToStorage(updatedItems);
       dispatch(setCartItems(updatedItems));
-      
     } catch (err: any) {
       console.error('Failed to add item to cart:', err);
       setError('Failed to add item to cart');
@@ -89,24 +104,15 @@ const useCart = () => {
   const updateQuantity = (productId: string, quantity: number) => {
     try {
       console.log(`Updating quantity for product ${productId} to ${quantity}`);
-      
-      // Get current items from localStorage
       const currentItems = getCartItemsFromStorage();
-      
-      // Update the specific item
       const updatedItems = currentItems.map((item) => {
         if (item.productId === productId) {
           return { ...item, quantity };
         }
         return item;
       });
-      
-      // Save to localStorage
-      saveCartItemsToStorage(updatedItems);
-      
-      // Update Redux store
+      saveCartAndItemsToStorage(updatedItems);
       dispatch(setCartItems(updatedItems));
-      
     } catch (err: any) {
       console.error('Failed to update item quantity:', err);
       setError('Failed to update item quantity');
@@ -116,19 +122,10 @@ const useCart = () => {
   const removeFromCart = (productId: string) => {
     try {
       console.log(`Removing product ${productId} from cart`);
-      
-      // Get current items from localStorage
       const currentItems = getCartItemsFromStorage();
-      
-      // Remove the item
       const updatedItems = currentItems.filter((item) => item.productId !== productId);
-      
-      // Save to localStorage
-      saveCartItemsToStorage(updatedItems);
-      
-      // Update Redux store
+      saveCartAndItemsToStorage(updatedItems);
       dispatch(setCartItems(updatedItems));
-      
     } catch (err: any) {
       console.error('Failed to remove item from cart:', err);
       setError('Failed to remove item from cart');
@@ -138,13 +135,9 @@ const useCart = () => {
   const emptyCart = () => {
     try {
       console.log('Clearing cart');
-      
-      // Clear localStorage
       localStorage.removeItem('cart_items');
-      
-      // Clear Redux store
+      localStorage.removeItem('cart');
       dispatch(clearCart());
-      
     } catch (err: any) {
       console.error('Failed to clear cart:', err);
       setError('Failed to clear cart');

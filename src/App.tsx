@@ -19,6 +19,7 @@ import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/cart/CartPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import AdminDashboard from './pages/admin';
 
 const AuthSyncer = () => {
   const dispatch = useDispatch();
@@ -52,6 +53,9 @@ const App = () => (
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/orders" element={<ProductListingPage />} />
           </Route>
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
 
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -4,6 +4,10 @@ import { Link } from 'react-router-dom';
 import { ShoppingCart, Check } from 'lucide-react';
 import { Product } from '../../types';
 import useCart from '../../hooks/useCart';
+import { STORAGE_KEYS } from '../../config';
+import api from '../../services/api';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 
 interface ProductCardProps {
   product: Product;
@@ -13,6 +17,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
   const [isAdding, setIsAdding] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
 
   // Ensure product is valid to prevent errors
   if (!product || typeof product !== 'object') {
@@ -20,16 +25,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     return null;
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     setIsAdding(true);
     
     // Create a cart item from the product
     const cartItem = {
-      productId: product.id.toString(), // Keep as string, conversion happens in useCart
+      productId: product.id.toString(),
       name: product.name,
       price: product.price,
-      quantity: 1,
-      imageUrl: product.imageUrl ?? undefined // Handle undefined image
+      quantity: 1
     };
     
     console.log('Adding to cart:', cartItem);
@@ -43,6 +47,37 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       setTimeout(() => {
         setAddSuccess(false);
       }, 2000);
+
+      // Only sync with backend if authenticated
+      if (!isAuthenticated) {
+        setIsAdding(false);
+        return;
+      }
+
+      // 2. Sync with backend (NEW)
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      let user = null;
+      if (userStr) {
+        try {
+          user = JSON.parse(userStr);
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+      if (user && token) {
+        try {
+          // Send only the item as AddItemRequest, not the whole cart
+          await api.post('/api/carts/current/items', {
+            productId: Number(product.id),
+            name: product.name,
+            price: product.price,
+            quantity: 1
+          });
+        } catch (err) {
+          localStorage.setItem('cartSyncError', 'true');
+        }
+      }
     } catch (error) {
       console.error('Error adding item to cart:', error);
     } finally {
