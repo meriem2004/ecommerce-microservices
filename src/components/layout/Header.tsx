@@ -1,13 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, ShoppingCart, User, Search } from 'lucide-react';
+import { 
+  Menu, 
+  X, 
+  ShoppingCart, 
+  User, 
+  Search, 
+  MapPin, 
+  Heart,
+  Bell,
+  Globe,
+  ChevronDown,
+  Package,
+  CreditCard,
+  Settings,
+  LogOut
+} from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import { getItemCount } from '../../utils/cart';
 import { STORAGE_KEYS } from '../../config';
+import { getCategories } from '../../services/product';
+import { Category } from '../../types';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const [isCategoriesMenuOpen, setIsCategoriesMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const [selectedCountry, setSelectedCountry] = useState('United States');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   
@@ -17,6 +42,34 @@ const Header: React.FC = () => {
     user: null
   });
   
+  const languages = [
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'es', name: 'Español', flag: '🇪🇸' },
+    { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+    { code: 'pt', name: 'Português', flag: '🇵🇹' },
+    { code: 'ar', name: 'العربية', flag: '🇸🇦' },
+    { code: 'zh', name: '中文', flag: '🇨🇳' }
+  ];
+
+  // Load categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const categoriesData = await getCategories();
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
   // Check authentication status directly from localStorage
   useEffect(() => {
     const checkAuth = () => {
@@ -38,10 +91,7 @@ const Header: React.FC = () => {
       });
     };
     
-    // Check on mount and whenever localStorage might change
     checkAuth();
-    
-    // Listen for storage events (in case another tab changes localStorage)
     window.addEventListener('storage', checkAuth);
     
     return () => {
@@ -56,204 +106,422 @@ const Header: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchTerm)}`);
+      let searchUrl = `/products?search=${encodeURIComponent(searchTerm)}`;
+      
+      // Add category filter if not "All"
+      if (selectedCategory !== 'All') {
+        const category = categories.find(cat => cat.name === selectedCategory);
+        if (category) {
+          searchUrl += `&category=${category.id}`;
+        }
+      }
+      
+      navigate(searchUrl);
       setSearchTerm('');
     }
   };
 
+  const handleCategorySelect = (categoryName: string) => {
+    setSelectedCategory(categoryName);
+    setIsCategoriesMenuOpen(false);
+  };
+
   const handleLogout = () => {
-    // Clear localStorage directly
     localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.USER);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     
-    // Also use the hook's logout if available
     if (logout) {
       logout();
     }
     
-    // Update local state
     setLocalAuth({
       isAuthenticated: false,
       user: null
     });
     
+    setIsUserMenuOpen(false);
     setIsMenuOpen(false);
     navigate('/');
   };
 
-  // Use either the hook's authentication state or our direct localStorage check
   const effectiveIsAuthenticated = isAuthenticated || localAuth.isAuthenticated;
   const effectiveUser = user || localAuth.user;
 
   return (
-    <header className="bg-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          {/* Logo and main navigation */}
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="text-xl font-bold text-blue-600">ShopHub</Link>
+    <>
+      {/* Top Navigation Bar */}
+      <div className="bg-gray-900 text-white text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-10">
+            {/* Left side */}
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-1 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer">
+                <MapPin className="h-4 w-4" />
+                <span>Deliver to {selectedCountry}</span>
+              </div>
             </div>
-            <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <Link to="/" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                Home
-              </Link>
-              <Link to="/products" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                Products
-              </Link>
-            </nav>
-          </div>
 
-          {/* Search box */}
-          <div className="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end">
-            <div className="max-w-lg w-full lg:max-w-xs">
-              <form onSubmit={handleSearch} className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search products..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-              </form>
-            </div>
-          </div>
-
-          {/* Right side icons */}
-          <div className="flex items-center">
-            <Link to="/cart" className="p-1 rounded-full text-gray-600 hover:text-gray-900 relative">
-              <span className="sr-only">View cart</span>
-              <ShoppingCart className="h-6 w-6" />
-              {getItemCount() > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-blue-600 rounded-full">
-                  {getItemCount()}
-                </span>
-              )}
-            </Link>
-            
-            {effectiveIsAuthenticated ? (
-              <div className="ml-3 relative">
-                <div>
-                  <button
-                    onClick={toggleMenu}
-                    className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <span className="sr-only">Open user menu</span>
-                    <User className="h-6 w-6 text-gray-600 hover:text-gray-900" />
-                  </button>
-                </div>
+            {/* Right side */}
+            <div className="flex items-center space-x-6">
+              {/* Language Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
+                  className="flex items-center space-x-1 hover:bg-gray-800 px-2 py-1 rounded"
+                >
+                  <Globe className="h-4 w-4" />
+                  <span>{selectedLanguage}</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
                 
-                {isMenuOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-10">
-                    <div className="px-4 py-2 text-xs text-gray-500">
-                      Signed in as <span className="font-semibold">{effectiveUser?.email}</span>
-                    </div>
-                    <Link 
-                      to="/profile" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Profile
-                    </Link>
-                    <Link 
-                      to="/orders" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Orders
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Sign out
-                    </button>
+                {isLanguageMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white text-gray-900 rounded-md shadow-lg py-1 z-50">
+                    {languages.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setSelectedLanguage(lang.name);
+                          setIsLanguageMenuOpen(false);
+                        }}
+                        className="flex items-center space-x-2 w-full px-4 py-2 text-sm hover:bg-gray-100"
+                      >
+                        <span>{lang.flag}</span>
+                        <span>{lang.name}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
-            ) : (
-              <Link to="/login" className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                Sign in
-              </Link>
-            )}
 
-            {/* Mobile menu button */}
-            <div className="ml-3 flex items-center sm:hidden">
+              {effectiveIsAuthenticated ? (
+                <span className="text-sm">Hello, {effectiveUser?.firstName || 'User'}</span>
+              ) : (
+                <Link to="/login" className="hover:underline">
+                  Hello, Sign in
+                </Link>
+              )}
+
+              <Link to="/orders" className="hover:underline hidden sm:block">
+                Returns & Orders
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Header */}
+      <header className="bg-gray-800 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center space-x-2 mr-8">
+                <div className="text-2xl font-bold text-white">
+                  Shop<span className="text-purple-400">Hub</span>
+                </div>
+              </Link>
+
+              {/* Categories Menu */}
+              <div className="hidden lg:block relative">
+                <button 
+                  onClick={() => setIsCategoriesMenuOpen(!isCategoriesMenuOpen)}
+                  className="flex items-center space-x-1 bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm font-medium"
+                >
+                  <Menu className="h-4 w-4" />
+                  <span>All Categories</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                
+                {isCategoriesMenuOpen && (
+                  <div className="absolute left-0 mt-2 w-64 bg-white text-gray-900 rounded-md shadow-lg py-2 z-50 max-h-96 overflow-y-auto">
+                    <Link
+                      to="/products"
+                      className="block px-4 py-2 text-sm hover:bg-gray-100"
+                      onClick={() => setIsCategoriesMenuOpen(false)}
+                    >
+                      All Products
+                    </Link>
+                    {loadingCategories ? (
+                      <div className="px-4 py-2 text-sm text-gray-500">Loading categories...</div>
+                    ) : (
+                      categories.map((category) => (
+                        <Link
+                          key={category.id}
+                          to={`/products?category=${category.id}`}
+                          className="block px-4 py-2 text-sm hover:bg-gray-100"
+                          onClick={() => setIsCategoriesMenuOpen(false)}
+                        >
+                          {category.name}
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="flex-1 max-w-2xl mx-4">
+              <form onSubmit={handleSearch} className="relative">
+                <div className="flex items-stretch h-10">
+                  <select 
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="bg-gray-200 border-none px-3 py-0 text-gray-900 text-sm rounded-l-md focus:outline-none focus:ring-2 focus:ring-purple-500 h-full min-w-[80px]"
+                  >
+                    <option value="All">All</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.name}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search ShopHub"
+                    className="flex-1 px-4 py-0 text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 border-0 h-full"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-purple-500 hover:bg-purple-600 px-4 py-0 rounded-r-md transition-colors h-full flex items-center justify-center"
+                  >
+                    <Search className="h-5 w-5 text-white" />
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Right side icons */}
+            <div className="flex items-center space-x-6">
+              {/* Wishlist */}
+              <Link to="/wishlist" className="hidden md:flex flex-col items-center hover:text-purple-400 transition-colors">
+                <Heart className="h-6 w-6" />
+                <span className="text-xs">Wishlist</span>
+              </Link>
+
+              {/* Cart */}
+              <Link to="/cart" className="flex items-center space-x-1 hover:text-purple-400 transition-colors relative">
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <ShoppingCart className="h-6 w-6" />
+                    {getItemCount() > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-purple-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {getItemCount()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs hidden sm:block">Cart</span>
+                </div>
+              </Link>
+
+              {/* User Menu */}
+              {effectiveIsAuthenticated ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center space-x-1 hover:text-purple-400 transition-colors"
+                  >
+                    <div className="flex flex-col items-center">
+                      <User className="h-6 w-6" />
+                      <div className="flex items-center space-x-1">
+                        <span className="text-xs hidden sm:block">Account</span>
+                        <ChevronDown className="h-3 w-3" />
+                      </div>
+                    </div>
+                  </button>
+                  
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white text-gray-900 rounded-md shadow-xl py-2 z-50">
+                      <div className="px-4 py-3 border-b border-gray-200">
+                        <p className="text-sm font-medium">{effectiveUser?.firstName} {effectiveUser?.lastName}</p>
+                        <p className="text-xs text-gray-500">{effectiveUser?.email}</p>
+                      </div>
+                      
+                      <Link 
+                        to="/profile" 
+                        className="flex items-center space-x-3 px-4 py-3 text-sm hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <User className="h-4 w-4" />
+                        <span>Your Profile</span>
+                      </Link>
+                      
+                      <Link 
+                        to="/orders" 
+                        className="flex items-center space-x-3 px-4 py-3 text-sm hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <Package className="h-4 w-4" />
+                        <span>Your Orders</span>
+                      </Link>
+                      
+                      <Link 
+                        to="/wishlist" 
+                        className="flex items-center space-x-3 px-4 py-3 text-sm hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <Heart className="h-4 w-4" />
+                        <span>Your Wishlist</span>
+                      </Link>
+                      
+                      <Link 
+                        to="/payments" 
+                        className="flex items-center space-x-3 px-4 py-3 text-sm hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Payment Methods</span>
+                      </Link>
+                      
+                      <div className="border-t border-gray-200 mt-2 pt-2">
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center space-x-3 w-full px-4 py-3 text-sm hover:bg-gray-100 text-red-600"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link 
+                  to="/login" 
+                  className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md font-medium transition-colors"
+                >
+                  Sign In
+                </Link>
+              )}
+
+              {/* Mobile menu button */}
               <button
                 onClick={toggleMenu}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                className="lg:hidden p-2 rounded-md hover:bg-gray-700"
               >
-                <span className="sr-only">Open main menu</span>
-                {isMenuOpen ? (
-                  <X className="block h-6 w-6" />
-                ) : (
-                  <Menu className="block h-6 w-6" />
-                )}
+                {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
             </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Sub Navigation */}
+      <div className="bg-gray-700 text-white text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center space-x-6 h-10 overflow-x-auto">
+            <Link to="/products" className="hover:text-purple-400 whitespace-nowrap">All Products</Link>
+            {categories.slice(0, 6).map((category) => (
+              <Link 
+                key={category.id}
+                to={`/products?category=${category.id}`} 
+                className="hover:text-purple-400 whitespace-nowrap"
+              >
+                {category.name}
+              </Link>
+            ))}
+            <Link to="/deals" className="hover:text-purple-400 whitespace-nowrap text-purple-300">Today's Deals</Link>
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="sm:hidden">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
-              to="/"
-              className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Home
-            </Link>
-            <Link
-              to="/products"
-              className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Products
-            </Link>
-            {!effectiveIsAuthenticated && (
+        <div className="lg:hidden bg-gray-800 border-t border-gray-700">
+          <div className="px-4 py-4 space-y-4">
+            <div className="space-y-2">
               <Link
-                to="/login"
-                className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                to="/"
+                className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Sign in
+                Home
               </Link>
-            )}
-            {effectiveIsAuthenticated && (
-              <>
+              <Link
+                to="/products"
+                className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                All Products
+              </Link>
+              
+              {/* Mobile Categories */}
+              <div className="border-t border-gray-700 pt-2">
+                <p className="px-3 py-2 text-sm font-medium text-gray-400">Categories</p>
+                {categories.map((category) => (
+                  <Link
+                    key={category.id}
+                    to={`/products?category=${category.id}`}
+                    className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 pl-6"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {category.name}
+                  </Link>
+                ))}
+              </div>
+              
+              <Link
+                to="/deals"
+                className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 text-purple-300"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Today's Deals
+              </Link>
+            </div>
+            
+            {effectiveIsAuthenticated ? (
+              <div className="border-t border-gray-700 pt-4 space-y-2">
                 <Link
                   to="/profile"
-                  className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                  className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Profile
+                  Your Profile
                 </Link>
                 <Link
                   to="/orders"
-                  className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                  className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Orders
+                  Your Orders
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 text-red-400"
                 >
-                  Sign out
+                  Sign Out
                 </button>
-              </>
+              </div>
+            ) : (
+              <div className="border-t border-gray-700 pt-4">
+                <Link
+                  to="/login"
+                  className="block px-3 py-2 rounded-md text-base font-medium bg-purple-500 text-white text-center"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sign In
+                </Link>
+              </div>
             )}
           </div>
         </div>
       )}
-    </header>
+
+      {/* Overlay for dropdowns */}
+      {(isUserMenuOpen || isLanguageMenuOpen || isCategoriesMenuOpen) && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setIsUserMenuOpen(false);
+            setIsLanguageMenuOpen(false);
+            setIsCategoriesMenuOpen(false);
+          }}
+        />
+      )}
+    </>
   );
 };
 
